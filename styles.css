@@ -195,13 +195,61 @@ h1 {
 .board-area {
   min-width: 0;
   display: grid;
-  gap: 14px;
+  gap: 0;
+}
+
+.display-base {
+  position: relative;
+  width: min(760px, 100%);
+  justify-self: center;
+  padding: 0 clamp(16px, 5vw, 58px) 22px;
+}
+
+.display-base::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 76px;
+  border-radius: 8px 8px 6px 6px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.22), transparent 24%, rgba(92,55,24,.1) 54%, transparent 82%),
+    linear-gradient(180deg, #e6c887, #d6aa68);
+  box-shadow: inset 0 0 0 7px rgba(111, 73, 34, .1), inset 0 -8px rgba(82, 47, 18, .13), 0 12px 24px rgba(56, 39, 20, .16);
+}
+
+.display-base::after {
+  content: "";
+  position: absolute;
+  left: 4%;
+  right: 4%;
+  bottom: 9px;
+  height: 18px;
+  border-radius: 12px;
+  background: rgba(106, 72, 37, .2);
+  box-shadow: inset 0 4px 8px rgba(61, 37, 17, .2), inset 0 -2px rgba(255,255,255,.2);
+}
+
+.hanger-block {
+  position: absolute;
+  left: clamp(18px, 5vw, 48px);
+  top: -3px;
+  width: 92px;
+  height: 76px;
+  border-radius: 6px 0 0 6px;
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.2), transparent 55%),
+    linear-gradient(180deg, #d3a05d, #b77e3b);
+  box-shadow: inset -6px 0 rgba(93, 54, 20, .16), 0 8px 18px rgba(56,39,20,.18);
 }
 
 .target-card {
   position: relative;
+  z-index: 1;
   width: min(640px, 100%);
   justify-self: center;
+  margin: 0 auto;
   padding: 22px 30px 20px;
   background: linear-gradient(180deg, #fff, #f5f1ec);
 }
@@ -251,6 +299,7 @@ h1 {
   position: relative;
   width: min(720px, 100%);
   justify-self: center;
+  margin-top: 14px;
   padding: clamp(24px, 4.5vw, 42px);
   border-radius: 8px;
   background:
@@ -330,6 +379,21 @@ h1 {
 
 .dragging-column {
   opacity: .72;
+}
+
+.pointer-dragging .play-column {
+  cursor: grabbing;
+}
+
+.drag-ghost {
+  position: fixed;
+  z-index: 40;
+  width: clamp(58px, 10vw, 88px);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: inset 0 -7px rgba(0, 0, 0, .17), 0 16px 22px rgba(46, 28, 11, .28);
+  transform: translate(-50%, -50%) scale(1.04);
 }
 
 .play-column.drop-target::after {
@@ -470,6 +534,16 @@ h1 {
 
   .target-card {
     padding-inline: 18px;
+  }
+
+  .display-base {
+    padding-inline: 0;
+    padding-bottom: 16px;
+  }
+
+  .hanger-block {
+    width: 70px;
+    height: 62px;
   }
 
   .wood-board {

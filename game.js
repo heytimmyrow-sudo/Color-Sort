@@ -25,6 +25,9 @@ const state = {
   records: loadRecords()
 };
 
+let pointerDrag = null;
+let suppressNextClick = false;
+
 const targetGrid = document.querySelector("#targetGrid");
 const slotGrid = document.querySelector("#slotGrid");
 const levelGrid = document.querySelector("#levelGrid");
@@ -284,12 +287,104 @@ function renderBoard() {
       topSlot?.setAttribute("draggable", "true");
       topSlot?.addEventListener("dragstart", (event) => handleDragStart(event, columnIndex));
       topSlot?.addEventListener("dragend", clearDragState);
+      topSlot?.addEventListener("pointerdown", (event) => handlePointerDown(event, columnIndex));
     }
 
     slotGrid.append(columnEl);
   });
 
   updateStats();
+}
+
+function handlePointerDown(event, columnIndex) {
+  if (state.completed || state.board[columnIndex].length === 0 || event.button > 0) return;
+  const topColor = state.board[columnIndex][state.board[columnIndex].length - 1];
+  pointerDrag = {
+    fromColumn: columnIndex,
+    startX: event.clientX,
+    startY: event.clientY,
+    x: event.clientX,
+    y: event.clientY,
+    color: topColor,
+    active: false,
+    ghost: null,
+    target: event.currentTarget
+  };
+  event.currentTarget.setPointerCapture?.(event.pointerId);
+  event.currentTarget.addEventListener("pointermove", handlePointerMove);
+  event.currentTarget.addEventListener("pointerup", handlePointerUp);
+  event.currentTarget.addEventListener("pointercancel", cancelPointerDrag);
+}
+
+function handlePointerMove(event) {
+  if (!pointerDrag) return;
+  pointerDrag.x = event.clientX;
+  pointerDrag.y = event.clientY;
+  const distance = Math.hypot(pointerDrag.x - pointerDrag.startX, pointerDrag.y - pointerDrag.startY);
+
+  if (!pointerDrag.active && distance > 8) {
+    startTimer();
+    pointerDrag.active = true;
+    suppressNextClick = true;
+    document.body.classList.add("pointer-dragging");
+    document.querySelector(`.play-column[data-column="${pointerDrag.fromColumn}"]`)?.classList.add("dragging-column");
+    pointerDrag.ghost = document.createElement("span");
+    pointerDrag.ghost.className = `drag-ghost ${pointerDrag.color}`;
+    document.body.append(pointerDrag.ghost);
+  }
+
+  if (!pointerDrag.active) return;
+  event.preventDefault();
+  movePointerGhost();
+  highlightPointerDropTarget();
+}
+
+function handlePointerUp(event) {
+  if (!pointerDrag) return;
+  const drag = pointerDrag;
+  const wasActive = drag.active;
+  const dropColumn = wasActive ? columnFromPoint(event.clientX, event.clientY) : null;
+  cancelPointerDrag();
+
+  if (wasActive) {
+    if (dropColumn !== null) moveTopToken(drag.fromColumn, dropColumn);
+    else statusText.textContent = "Drop the token onto a column with open space.";
+  }
+}
+
+function cancelPointerDrag() {
+  pointerDrag?.target?.removeEventListener("pointermove", handlePointerMove);
+  pointerDrag?.target?.removeEventListener("pointerup", handlePointerUp);
+  pointerDrag?.target?.removeEventListener("pointercancel", cancelPointerDrag);
+  if (pointerDrag?.ghost) pointerDrag.ghost.remove();
+  pointerDrag = null;
+  document.body.classList.remove("pointer-dragging");
+  document.querySelectorAll(".drop-target").forEach((column) => column.classList.remove("drop-target"));
+  document.querySelectorAll(".dragging-column").forEach((column) => column.classList.remove("dragging-column"));
+}
+
+function movePointerGhost() {
+  if (!pointerDrag?.ghost) return;
+  pointerDrag.ghost.style.left = `${pointerDrag.x}px`;
+  pointerDrag.ghost.style.top = `${pointerDrag.y}px`;
+}
+
+function columnFromPoint(x, y) {
+  const element = document.elementFromPoint(x, y);
+  const column = element?.closest?.(".play-column");
+  if (!column) return null;
+  const index = Number(column.dataset.column);
+  if (!Number.isInteger(index)) return null;
+  if (index === pointerDrag?.fromColumn) return null;
+  if (state.board[index].length >= columnCapacity) return null;
+  return index;
+}
+
+function highlightPointerDropTarget() {
+  const targetColumn = columnFromPoint(pointerDrag.x, pointerDrag.y);
+  document.querySelectorAll(".play-column").forEach((column) => {
+    column.classList.toggle("drop-target", Number(column.dataset.column) === targetColumn);
+  });
 }
 
 function columnLabel(columnIndex) {
@@ -326,6 +421,10 @@ function handleDrop(event, toColumn) {
 }
 
 function selectOrMove(columnIndex) {
+  if (suppressNextClick) {
+    suppressNextClick = false;
+    return;
+  }
   if (state.completed) return;
   if (state.selectedColumn === null) {
     if (state.board[columnIndex].length === 0) {
