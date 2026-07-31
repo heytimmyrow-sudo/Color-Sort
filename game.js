@@ -68,6 +68,7 @@ const themeSelect = document.querySelector("#themeSelect");
 const moveHistoryList = document.querySelector("#moveHistoryList");
 const installBtn = document.querySelector("#installBtn");
 const installText = document.querySelector("#installText");
+const shareAppBtn = document.querySelector("#shareAppBtn");
 const mobileUndoBtn = document.querySelector("#mobileUndoBtn");
 const mobileRestartBtn = document.querySelector("#mobileRestartBtn");
 const mobileHintBtn = document.querySelector("#mobileHintBtn");
@@ -752,6 +753,21 @@ async function shareResult() {
   }
 }
 
+async function shareApp() {
+  const text = `Play Token Columns: ${liveUrl}`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title: "Token Columns", text: "Play Token Columns.", url: liveUrl });
+    } else {
+      installText.textContent = "Copying the app link...";
+      await navigator.clipboard.writeText(text);
+      installText.textContent = "App link copied. Send it to anyone you want to play with.";
+    }
+  } catch {
+    installText.textContent = "Share was canceled.";
+  }
+}
+
 function playTone(frequency, duration) {
   if (state.prefs.muted) return;
   try {
@@ -831,6 +847,7 @@ themeSelect.addEventListener("change", () => {
   applyPrefs();
 });
 installBtn.addEventListener("click", installApp);
+shareAppBtn.addEventListener("click", shareApp);
 winNextBtn.addEventListener("click", nextLevel);
 winReplayBtn.addEventListener("click", restartLevel);
 winDialog.addEventListener("click", (event) => {

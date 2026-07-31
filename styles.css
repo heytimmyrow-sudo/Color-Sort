@@ -663,8 +663,15 @@ h1 {
   font-weight: 750;
 }
 
-.qr-section button {
+.qr-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 12px;
+}
+
+.qr-actions button {
+  flex: 1 1 150px;
 }
 
 .qr-section img {
