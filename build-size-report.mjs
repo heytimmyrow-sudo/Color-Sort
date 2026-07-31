@@ -6,6 +6,7 @@ const initialFiles = [
   "styles.css",
   "game.js",
   "app-icon.svg",
+  "qr-code.svg",
   "app-icon-180.png",
   "manifest.webmanifest"
 ];

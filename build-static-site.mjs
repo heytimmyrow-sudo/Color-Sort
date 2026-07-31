@@ -5,6 +5,7 @@ const textFileNames = [
   "styles.css",
   "game.js",
   "app-icon.svg",
+  "qr-code.svg",
   "manifest.webmanifest"
 ];
 const binaryFileNames = [
@@ -26,6 +27,7 @@ const contentTypes = {
   "styles.css": "text/css; charset=utf-8",
   "game.js": "text/javascript; charset=utf-8",
   "app-icon.svg": "image/svg+xml; charset=utf-8",
+  "qr-code.svg": "image/svg+xml; charset=utf-8",
   "app-icon-180.png": "image/png",
   "manifest.webmanifest": "application/manifest+json; charset=utf-8"
 };

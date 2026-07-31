@@ -12,6 +12,7 @@ Players lift only the top token from a column and drop it onto another column wi
 - Move count for each level
 - Personal best move records saved in local browser storage
 - Gold level buttons when the default move record is beaten
+- Large QR code near the bottom for opening the game on another device
 - Static site build with no server dependency
 
 ## Run Locally
