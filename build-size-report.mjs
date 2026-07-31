@@ -5,7 +5,9 @@ const initialFiles = [
   "index.html",
   "styles.css",
   "game.js",
-  "app-icon.svg"
+  "app-icon.svg",
+  "app-icon-180.png",
+  "manifest.webmanifest"
 ];
 const limits = {
   initialBytes: 5 * 1024 * 1024,

@@ -4,20 +4,30 @@ const textFileNames = [
   "index.html",
   "styles.css",
   "game.js",
-  "app-icon.svg"
+  "app-icon.svg",
+  "manifest.webmanifest"
+];
+const binaryFileNames = [
+  "app-icon-180.png"
 ];
 
 const textFiles = Object.fromEntries(await Promise.all(
   textFileNames.map(async (name) => [name, await readFile(name, "utf8")])
 ));
+const binaryFiles = Object.fromEntries(await Promise.all(
+  binaryFileNames.map(async (name) => [name, (await readFile(name)).toString("base64")])
+));
 
 const worker = `const textFiles = ${JSON.stringify(textFiles)};
+const binaryFiles = ${JSON.stringify(binaryFiles)};
 
 const contentTypes = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
   "game.js": "text/javascript; charset=utf-8",
-  "app-icon.svg": "image/svg+xml; charset=utf-8"
+  "app-icon.svg": "image/svg+xml; charset=utf-8",
+  "app-icon-180.png": "image/png",
+  "manifest.webmanifest": "application/manifest+json; charset=utf-8"
 };
 
 export default {
@@ -36,6 +46,17 @@ export default {
       return new Response(textBody, {
         headers: {
           "content-type": contentTypes[key] || "text/plain; charset=utf-8",
+          "cache-control": "no-store"
+        }
+      });
+    }
+
+    const binaryBody = binaryFiles[key];
+    if (binaryBody !== undefined) {
+      const bytes = Uint8Array.from(atob(binaryBody), (char) => char.charCodeAt(0));
+      return new Response(bytes, {
+        headers: {
+          "content-type": contentTypes[key] || "application/octet-stream",
           "cache-control": "no-store"
         }
       });
