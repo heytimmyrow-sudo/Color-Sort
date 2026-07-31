@@ -35,9 +35,27 @@
 
       <section class="play-layout">
         <aside class="level-panel" aria-label="Level selection">
+          <label class="select-label" for="packSelect">Level pack</label>
+          <select id="packSelect">
+            <option value="classic">Classic</option>
+            <option value="starter">Starter</option>
+            <option value="challenge">Challenge</option>
+            <option value="expert">Expert</option>
+            <option value="daily">Daily</option>
+          </select>
           <div class="level-head">
             <span id="levelName">Level 1</span>
             <span id="levelCount">1 / 40</span>
+          </div>
+          <div class="level-meta" aria-label="Level details">
+            <span id="difficultyText">Easy</span>
+            <span id="minimumMoves">Minimum --</span>
+          </div>
+          <div class="level-legend" aria-label="Level color key">
+            <span><i class="legend-white"></i>New</span>
+            <span><i class="legend-yellow"></i>Started</span>
+            <span><i class="legend-green"></i>Done</span>
+            <span><i class="legend-gold"></i>Record</span>
           </div>
           <div class="level-grid" id="levelGrid"></div>
         </aside>
@@ -75,10 +93,26 @@
           </div>
           <div class="actions">
             <button class="primary" id="nextLevelBtn" type="button">Next Level</button>
+            <button id="hintBtn" type="button">Hint</button>
             <button id="restartBtn" type="button">Restart</button>
             <button id="undoBtn" type="button">Undo Move</button>
             <button id="newScrambleBtn" type="button">New Scramble</button>
+            <button id="shareBtn" type="button">Share Result</button>
             <button id="clearRecordsBtn" type="button">Clear Records</button>
+          </div>
+          <div class="settings-grid" aria-label="Game settings">
+            <button id="muteBtn" type="button">Sound On</button>
+            <button id="symbolsBtn" type="button">Symbols Off</button>
+            <label class="select-label" for="themeSelect">Theme</label>
+            <select id="themeSelect">
+              <option value="toy">Toy</option>
+              <option value="dark">Dark</option>
+              <option value="contrast">High Contrast</option>
+            </select>
+          </div>
+          <div class="history-tray" aria-label="Move history">
+            <span class="status-label">Move History</span>
+            <ol id="moveHistoryList"></ol>
           </div>
         </aside>
       </section>
@@ -88,6 +122,8 @@
           <p class="eyebrow">Open on phone</p>
           <h2 id="qrTitle">Scan to play</h2>
           <p>Use this code to open Token Columns on another device.</p>
+          <button id="installBtn" type="button">Add to Home Screen</button>
+          <p id="installText">Install it as a home-screen shortcut, then play without hunting for the link.</p>
         </div>
         <img src="qr-code.svg" width="328" height="328" alt="QR code for Token Columns">
       </section>
@@ -105,6 +141,13 @@
       </div>
     </div>
   </div>
+
+  <nav class="mobile-controls" aria-label="Quick controls">
+    <button id="mobileUndoBtn" type="button">Undo</button>
+    <button id="mobileRestartBtn" type="button">Restart</button>
+    <button id="mobileHintBtn" type="button">Hint</button>
+    <button id="mobileShareBtn" type="button">Share</button>
+  </nav>
 
   <script type="module" src="game.js?v=1"></script>
 </body>

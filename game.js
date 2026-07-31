@@ -1,54 +1,86 @@
 const colorOrder = ["red", "yellow", "green", "blue"];
-const colorNames = {
-  red: "red",
-  yellow: "yellow",
-  green: "green",
-  blue: "blue"
-};
-
-const levelTotal = 40;
+const colorNames = { red: "red", yellow: "yellow", green: "green", blue: "blue" };
+const colorSymbols = { red: "R", yellow: "Y", green: "G", blue: "B" };
 const targetHeight = 4;
 const columnCount = 4;
 const columnCapacity = 6;
-const recordKey = "tokenColumnsRecords";
-const progressKey = "tokenColumnsProgress";
+const recordsKey = "tokenColumnsRecordsV2";
+const progressKey = "tokenColumnsProgressV2";
+const savesKey = "tokenColumnsSavesV2";
+const prefsKey = "tokenColumnsPrefsV2";
+const packKey = "tokenColumnsPackV2";
+const liveUrl = "https://new-games-jcrow.timmyrow.chatgpt.site";
+
+const packDefs = [
+  { id: "classic", name: "Classic", total: 40, seed: 90210, extra: 0 },
+  { id: "starter", name: "Starter", total: 30, seed: 74011, extra: -10 },
+  { id: "challenge", name: "Challenge", total: 45, seed: 120303, extra: 12 },
+  { id: "expert", name: "Expert", total: 50, seed: 421337, extra: 25 },
+  { id: "daily", name: "Daily", total: 1, seed: dailySeed(), extra: 16 }
+];
+
+const levelCache = new Map();
 const state = {
+  packId: localStorage.getItem(packKey) || "classic",
   levelIndex: 0,
   board: [],
   target: [],
   history: [],
+  moveLog: [],
   selectedColumn: null,
   moves: 0,
   completed: false,
   dragFromColumn: null,
-  records: loadStoredMap(recordKey),
-  progress: loadStoredMap(progressKey)
+  records: loadStoredMap(recordsKey),
+  progress: loadStoredMap(progressKey),
+  saves: loadStoredMap(savesKey),
+  prefs: { muted: false, symbols: false, theme: "toy", ...loadStoredMap(prefsKey) }
 };
 
 let pointerDrag = null;
 let suppressNextClick = false;
+let deferredInstallPrompt = null;
+let audioContext = null;
 
 const targetGrid = document.querySelector("#targetGrid");
 const slotGrid = document.querySelector("#slotGrid");
 const levelGrid = document.querySelector("#levelGrid");
 const levelName = document.querySelector("#levelName");
 const levelCount = document.querySelector("#levelCount");
+const difficultyText = document.querySelector("#difficultyText");
+const minimumMoves = document.querySelector("#minimumMoves");
 const recordTarget = document.querySelector("#recordTarget");
 const bestMoves = document.querySelector("#bestMoves");
 const moveCount = document.querySelector("#moveCount");
 const matchedCount = document.querySelector("#matchedCount");
 const statusText = document.querySelector("#statusText");
+const packSelect = document.querySelector("#packSelect");
 const restartBtn = document.querySelector("#restartBtn");
 const undoBtn = document.querySelector("#undoBtn");
+const hintBtn = document.querySelector("#hintBtn");
 const newScrambleBtn = document.querySelector("#newScrambleBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
+const shareBtn = document.querySelector("#shareBtn");
 const clearRecordsBtn = document.querySelector("#clearRecordsBtn");
+const muteBtn = document.querySelector("#muteBtn");
+const symbolsBtn = document.querySelector("#symbolsBtn");
+const themeSelect = document.querySelector("#themeSelect");
+const moveHistoryList = document.querySelector("#moveHistoryList");
+const installBtn = document.querySelector("#installBtn");
+const installText = document.querySelector("#installText");
+const mobileUndoBtn = document.querySelector("#mobileUndoBtn");
+const mobileRestartBtn = document.querySelector("#mobileRestartBtn");
+const mobileHintBtn = document.querySelector("#mobileHintBtn");
+const mobileShareBtn = document.querySelector("#mobileShareBtn");
 const winDialog = document.querySelector("#winDialog");
 const winSummary = document.querySelector("#winSummary");
 const winNextBtn = document.querySelector("#winNextBtn");
 const winReplayBtn = document.querySelector("#winReplayBtn");
 
-const levels = Array.from({ length: levelTotal }, (_, index) => createLevel(index));
+function dailySeed() {
+  const now = new Date();
+  return Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
+}
 
 function mulberry32(seed) {
   return function next() {
@@ -61,10 +93,6 @@ function mulberry32(seed) {
 
 function cloneColumns(columns) {
   return columns.map((column) => [...column]);
-}
-
-function flatten(columns) {
-  return columns.flatMap((column) => column);
 }
 
 function toColumns(items, height = targetHeight) {
@@ -80,34 +108,43 @@ function shuffle(items, random) {
   return copy;
 }
 
-function createTarget(random, levelIndex) {
+function activePack() {
+  return packDefs.find((pack) => pack.id === state.packId) || packDefs[0];
+}
+
+function levelsForPack(pack = activePack()) {
+  if (!levelCache.has(pack.id)) {
+    levelCache.set(pack.id, Array.from({ length: pack.total }, (_, index) => createLevel(index, pack)));
+  }
+  return levelCache.get(pack.id);
+}
+
+function levelKey(index = state.levelIndex) {
+  return `${state.packId}:${index}`;
+}
+
+function createTarget(random, levelIndex, pack) {
   const bag = colorOrder.flatMap((color) => Array(targetHeight).fill(color));
   let target = toColumns(shuffle(bag, random));
-
-  if (levelIndex < 8) {
+  if (pack.id === "starter" || (pack.id === "classic" && levelIndex < 8)) {
     target = Array.from({ length: columnCount }, (_, columnIndex) => {
-      const rotated = [...colorOrder.slice(columnIndex), ...colorOrder.slice(0, columnIndex)];
-      return rotated;
+      return [...colorOrder.slice(columnIndex), ...colorOrder.slice(0, columnIndex)];
     });
   }
-
   return target;
 }
 
-function createLevel(index, salt = 0) {
-  const random = mulberry32(90210 + index * 177 + salt * 9973);
-  const target = createTarget(random, index);
+function createLevel(index, pack, salt = 0) {
+  const random = mulberry32(pack.seed + index * 177 + salt * 9973);
+  const target = createTarget(random, index, pack);
   let board = cloneColumns(target);
-  const moveCountGoal = 20 + index + Math.floor(random() * 12);
+  const moveCountGoal = Math.max(12, 20 + index + pack.extra + Math.floor(random() * 12));
   let lastMove = null;
   const scrambleMoves = [];
 
   for (let step = 0; step < moveCountGoal; step += 1) {
-    const moves = legalMoves(board).filter((move) => {
-      if (!lastMove) return true;
-      return !(move.from === lastMove.to && move.to === lastMove.from);
-    });
-    const move = moves[Math.floor(random() * moves.length)] || legalMoves(board)[0];
+    const choices = legalMoves(board).filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
+    const move = choices[Math.floor(random() * choices.length)] || legalMoves(board)[0];
     applyMove(board, move.from, move.to);
     scrambleMoves.push(move);
     lastMove = move;
@@ -122,11 +159,14 @@ function createLevel(index, salt = 0) {
   const solution = scrambleMoves.reverse().map((move) => ({ from: move.to, to: move.from }));
   const proofBoard = cloneColumns(board);
   solution.forEach((move) => applyMove(proofBoard, move.from, move.to));
-  if (!isSolved(proofBoard, target)) {
-    throw new Error(`Generated level ${index + 1} is not solvable`);
-  }
-  const defaultRecord = solution.length + 5 + Math.floor(random() * 6);
-  return { target, board, solution, defaultRecord };
+  if (!isSolved(proofBoard, target)) throw new Error(`Generated ${pack.name} level ${index + 1} is not solvable`);
+  return {
+    target,
+    board,
+    solution,
+    defaultRecord: solution.length + 5 + Math.floor(random() * 6),
+    difficulty: difficultyFor(solution.length)
+  };
 }
 
 function legalMoves(board) {
@@ -134,9 +174,7 @@ function legalMoves(board) {
   for (let from = 0; from < columnCount; from += 1) {
     if (board[from].length === 0) continue;
     for (let to = 0; to < columnCount; to += 1) {
-      if (from !== to && board[to].length < columnCapacity) {
-        moves.push({ from, to });
-      }
+      if (from !== to && board[to].length < columnCapacity) moves.push({ from, to });
     }
   }
   return moves;
@@ -145,6 +183,7 @@ function legalMoves(board) {
 function applyMove(board, fromColumn, toColumn) {
   const token = board[fromColumn].pop();
   if (token) board[toColumn].push(token);
+  return token;
 }
 
 function countMatches(board, target) {
@@ -161,57 +200,87 @@ function isSolved(board, target) {
   return board.every((column) => column.length === targetHeight) && countMatches(board, target) === columnCount * targetHeight;
 }
 
+function difficultyFor(solutionLength) {
+  if (solutionLength <= 24) return "Easy";
+  if (solutionLength <= 38) return "Medium";
+  if (solutionLength <= 55) return "Hard";
+  return "Expert";
+}
+
 function loadStoredMap(key) {
   try {
-    const records = JSON.parse(localStorage.getItem(key) || "{}");
-    return records && typeof records === "object" ? records : {};
+    const value = JSON.parse(localStorage.getItem(key) || "{}");
+    return value && typeof value === "object" ? value : {};
   } catch {
     return {};
   }
 }
 
-function saveRecords() {
-  localStorage.setItem(recordKey, JSON.stringify(state.records));
+function saveJson(key, value) {
+  localStorage.setItem(key, JSON.stringify(value));
 }
 
-function saveProgress() {
-  localStorage.setItem(progressKey, JSON.stringify(state.progress));
+function savePrefs() {
+  saveJson(prefsKey, state.prefs);
 }
 
 function markInProgress() {
   if (state.completed) return;
-  if (state.records[state.levelIndex] === undefined && !state.progress[state.levelIndex]) {
-    state.progress[state.levelIndex] = true;
-    saveProgress();
+  const key = levelKey();
+  if (state.records[key] === undefined && !state.progress[key]) {
+    state.progress[key] = true;
+    saveJson(progressKey, state.progress);
     renderLevelButtons();
   }
 }
 
+function saveCurrentBoard() {
+  if (state.completed) return;
+  state.saves[levelKey()] = {
+    board: cloneColumns(state.board),
+    moves: state.moves,
+    history: state.history,
+    moveLog: state.moveLog
+  };
+  saveJson(savesKey, state.saves);
+}
+
+function clearCurrentSave(index = state.levelIndex) {
+  delete state.saves[`${state.packId}:${index}`];
+  saveJson(savesKey, state.saves);
+}
+
 function renderLevelButtons() {
+  const levels = levelsForPack();
   levelGrid.innerHTML = "";
-  levels.forEach((_, index) => {
+  levels.forEach((level, index) => {
+    const key = levelKey(index);
     const button = document.createElement("button");
     button.className = "level-button";
     button.type = "button";
     button.textContent = String(index + 1);
-    button.setAttribute("aria-label", `Level ${index + 1}`);
+    button.setAttribute("aria-label", `${activePack().name} level ${index + 1}, ${level.difficulty}`);
     if (index === state.levelIndex) button.classList.add("active");
-    if (state.records[index] !== undefined && state.records[index] < levels[index].defaultRecord) {
+    if (state.records[key] !== undefined && state.records[key] < level.defaultRecord) {
       button.classList.add("gold-record");
-      button.setAttribute("title", "Default record beaten");
-    } else if (state.records[index] !== undefined) {
+      button.title = "Default move record beaten";
+    } else if (state.records[key] !== undefined) {
       button.classList.add("solved");
-      button.setAttribute("title", "Completed");
-    } else if (state.progress[index]) {
+      button.title = "Completed";
+    } else if (state.progress[key]) {
       button.classList.add("in-progress");
-      button.setAttribute("title", "In progress");
+      button.title = "In progress";
     } else {
       button.classList.add("not-attempted");
-      button.setAttribute("title", "Not attempted");
+      button.title = "Not attempted";
     }
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
   });
+}
+
+function tokenText(color) {
+  return state.prefs.symbols ? colorSymbols[color] : "";
 }
 
 function renderTargets() {
@@ -224,6 +293,7 @@ function renderTargets() {
       const token = document.createElement("span");
       token.className = `target-token ${color}`;
       token.title = colorNames[color];
+      token.textContent = tokenText(color);
       columnEl.append(token);
     });
     targetGrid.append(columnEl);
@@ -242,9 +312,7 @@ function renderBoard() {
     if (column.length < columnCapacity) columnEl.classList.add("can-receive");
     columnEl.addEventListener("click", () => selectOrMove(columnIndex));
     columnEl.addEventListener("dragover", (event) => {
-      if (state.dragFromColumn !== null && state.dragFromColumn !== columnIndex && column.length < columnCapacity) {
-        event.preventDefault();
-      }
+      if (state.dragFromColumn !== null && state.dragFromColumn !== columnIndex && column.length < columnCapacity) event.preventDefault();
     });
     columnEl.addEventListener("dragenter", () => columnEl.classList.add("drop-target"));
     columnEl.addEventListener("dragleave", () => columnEl.classList.remove("drop-target"));
@@ -257,14 +325,13 @@ function renderBoard() {
       slot.className = "slot";
       slot.dataset.column = columnIndex;
       slot.dataset.stackIndex = stackIndex;
-
       if (color) {
         const token = document.createElement("span");
         token.className = `token ${color}`;
         token.title = `${colorNames[color]} token`;
+        token.textContent = tokenText(color);
         slot.append(token);
       }
-
       columnEl.append(slot);
     }
 
@@ -277,11 +344,27 @@ function renderBoard() {
       topSlot?.addEventListener("dragend", clearDragState);
       topSlot?.addEventListener("pointerdown", (event) => handlePointerDown(event, columnIndex));
     }
-
     slotGrid.append(columnEl);
   });
-
   updateStats();
+  renderHistory();
+}
+
+function renderHistory() {
+  moveHistoryList.innerHTML = "";
+  const recent = state.moveLog.slice(-8);
+  if (recent.length === 0) {
+    const item = document.createElement("li");
+    item.textContent = "No moves yet";
+    moveHistoryList.append(item);
+    return;
+  }
+  recent.forEach((move, offset) => {
+    const item = document.createElement("li");
+    const moveNumber = state.moveLog.length - recent.length + offset + 1;
+    item.textContent = `${moveNumber}. ${colorNames[move.color]} ${move.from + 1} to ${move.to + 1}`;
+    moveHistoryList.append(item);
+  });
 }
 
 function handlePointerDown(event, columnIndex) {
@@ -309,7 +392,6 @@ function handlePointerMove(event) {
   pointerDrag.x = event.clientX;
   pointerDrag.y = event.clientY;
   const distance = Math.hypot(pointerDrag.x - pointerDrag.startX, pointerDrag.y - pointerDrag.startY);
-
   if (!pointerDrag.active && distance > 8) {
     markInProgress();
     pointerDrag.active = true;
@@ -318,9 +400,9 @@ function handlePointerMove(event) {
     document.querySelector(`.play-column[data-column="${pointerDrag.fromColumn}"]`)?.classList.add("dragging-column");
     pointerDrag.ghost = document.createElement("span");
     pointerDrag.ghost.className = `drag-ghost ${pointerDrag.color}`;
+    pointerDrag.ghost.textContent = tokenText(pointerDrag.color);
     document.body.append(pointerDrag.ghost);
   }
-
   if (!pointerDrag.active) return;
   event.preventDefault();
   movePointerGhost();
@@ -333,7 +415,6 @@ function handlePointerUp(event) {
   const wasActive = drag.active;
   const dropColumn = wasActive ? columnFromPoint(event.clientX, event.clientY) : null;
   cancelPointerDrag();
-
   if (wasActive) {
     if (dropColumn !== null) moveTopToken(drag.fromColumn, dropColumn);
     else statusText.textContent = "Drop the token onto a column with open space.";
@@ -347,7 +428,7 @@ function cancelPointerDrag() {
   if (pointerDrag?.ghost) pointerDrag.ghost.remove();
   pointerDrag = null;
   document.body.classList.remove("pointer-dragging");
-  document.querySelectorAll(".drop-target").forEach((column) => column.classList.remove("drop-target"));
+  clearHighlights();
   document.querySelectorAll(".dragging-column").forEach((column) => column.classList.remove("dragging-column"));
 }
 
@@ -362,9 +443,7 @@ function columnFromPoint(x, y) {
   const column = element?.closest?.(".play-column");
   if (!column) return null;
   const index = Number(column.dataset.column);
-  if (!Number.isInteger(index)) return null;
-  if (index === pointerDrag?.fromColumn) return null;
-  if (state.board[index].length >= columnCapacity) return null;
+  if (!Number.isInteger(index) || index === pointerDrag?.fromColumn || state.board[index].length >= columnCapacity) return null;
   return index;
 }
 
@@ -372,6 +451,12 @@ function highlightPointerDropTarget() {
   const targetColumn = columnFromPoint(pointerDrag.x, pointerDrag.y);
   document.querySelectorAll(".play-column").forEach((column) => {
     column.classList.toggle("drop-target", Number(column.dataset.column) === targetColumn);
+  });
+}
+
+function clearHighlights() {
+  document.querySelectorAll(".drop-target,.hint-source,.hint-target").forEach((column) => {
+    column.classList.remove("drop-target", "hint-source", "hint-target");
   });
 }
 
@@ -396,7 +481,7 @@ function handleDragStart(event, columnIndex) {
 
 function clearDragState() {
   state.dragFromColumn = null;
-  document.querySelectorAll(".drop-target").forEach((column) => column.classList.remove("drop-target"));
+  clearHighlights();
   document.querySelectorAll(".dragging-column").forEach((column) => column.classList.remove("dragging-column"));
 }
 
@@ -414,6 +499,7 @@ function selectOrMove(columnIndex) {
     return;
   }
   if (state.completed) return;
+  clearHighlights();
   if (state.selectedColumn === null) {
     if (state.board[columnIndex].length === 0) {
       statusText.textContent = "That column is empty. Choose a column with a top token.";
@@ -425,20 +511,18 @@ function selectOrMove(columnIndex) {
     renderBoard();
     return;
   }
-
   if (state.selectedColumn === columnIndex) {
     state.selectedColumn = null;
     statusText.textContent = "Selection cleared. Choose the top token from any column.";
     renderBoard();
     return;
   }
-
   moveTopToken(state.selectedColumn, columnIndex);
 }
 
 function moveTopToken(fromColumn, toColumn) {
-  if (state.completed) return;
-  if (fromColumn === toColumn) return;
+  if (state.completed || fromColumn === toColumn) return;
+  clearHighlights();
   if (state.board[fromColumn].length === 0) {
     state.selectedColumn = null;
     statusText.textContent = "That column has no token to move.";
@@ -451,71 +535,98 @@ function moveTopToken(fromColumn, toColumn) {
     renderBoard();
     return;
   }
-
+  const movedColor = state.board[fromColumn][state.board[fromColumn].length - 1];
   markInProgress();
-  state.history.push({
-    board: cloneColumns(state.board),
-    moves: state.moves
-  });
+  state.history.push({ board: cloneColumns(state.board), moves: state.moves, moveLog: [...state.moveLog] });
   applyMove(state.board, fromColumn, toColumn);
+  state.moveLog.push({ from: fromColumn, to: toColumn, color: movedColor });
   state.selectedColumn = null;
   state.moves += 1;
   statusText.textContent = "Good. Keep moving only the top tokens until the four shown positions match.";
+  playTone(392, 0.06);
+  saveCurrentBoard();
   renderBoard();
   checkSolved();
 }
 
 function updateStats() {
-  const matches = countMatches(state.board, state.target);
+  const levels = levelsForPack();
   const level = levels[state.levelIndex];
+  const key = levelKey();
+  const record = state.records[key];
+  const matches = countMatches(state.board, state.target);
   moveCount.textContent = String(state.moves);
   matchedCount.textContent = `${matches} / ${columnCount * targetHeight}`;
-  levelName.textContent = `Level ${state.levelIndex + 1}`;
-  levelCount.textContent = `${state.levelIndex + 1} / ${levelTotal}`;
-  const record = state.records[state.levelIndex];
+  levelName.textContent = `${activePack().name} ${state.levelIndex + 1}`;
+  levelCount.textContent = `${state.levelIndex + 1} / ${levels.length}`;
+  difficultyText.textContent = level.difficulty;
   recordTarget.textContent = `${level.defaultRecord} moves`;
   bestMoves.textContent = record === undefined ? "Best --" : `Best ${record}`;
   undoBtn.disabled = state.history.length === 0 || state.completed;
+  mobileUndoBtn.disabled = undoBtn.disabled;
+  nextLevelBtn.disabled = levels.length === 1;
+}
+
+function updateMinimumDisplay() {
+  const level = levelsForPack()[state.levelIndex];
+  minimumMoves.textContent = "Minimum checking";
+  window.setTimeout(() => {
+    const answer = findShortestSolution(level.board, level.target, 160000);
+    level.minimumMoves = answer ? answer.length : level.solution.length;
+    minimumMoves.textContent = `Minimum ${level.minimumMoves}`;
+  }, 20);
 }
 
 function checkSolved() {
   if (!isSolved(state.board, state.target)) return;
   state.completed = true;
-  const previous = state.records[state.levelIndex];
+  const key = levelKey();
+  const previous = state.records[key];
   const isRecord = previous === undefined || state.moves < previous;
   if (isRecord) {
-    state.records[state.levelIndex] = state.moves;
-    saveRecords();
+    state.records[key] = state.moves;
+    saveJson(recordsKey, state.records);
   }
-  delete state.progress[state.levelIndex];
-  saveProgress();
+  delete state.progress[key];
+  delete state.saves[key];
+  saveJson(progressKey, state.progress);
+  saveJson(savesKey, state.saves);
   renderLevelButtons();
   updateStats();
-  const defaultRecord = levels[state.levelIndex].defaultRecord;
-  const defaultMessage = state.moves < defaultRecord ? " You beat the default record." : ` Default record: ${defaultRecord} moves.`;
+  playTone(659, 0.08);
+  window.setTimeout(() => playTone(880, 0.12), 90);
+  document.querySelector(".wood-board")?.classList.add("celebrate");
+  const defaultRecord = levelsForPack()[state.levelIndex].defaultRecord;
+  const defaultMessage = state.moves < defaultRecord ? " You beat the default record, so this level turned gold." : ` Default record: ${defaultRecord} moves.`;
   winSummary.textContent = `${state.moves} moves.${isRecord ? " New personal best." : ""}${defaultMessage}`;
   winDialog.classList.remove("hidden");
 }
 
 function loadLevel(index) {
-  const level = levels[index];
-  state.levelIndex = index;
-  state.board = cloneColumns(level.board);
+  const levels = levelsForPack();
+  const level = levels[index] || levels[0];
+  state.levelIndex = Math.min(index, levels.length - 1);
+  const saved = state.saves[levelKey(state.levelIndex)];
+  state.board = saved?.board ? cloneColumns(saved.board) : cloneColumns(level.board);
   state.target = cloneColumns(level.target);
-  state.history = [];
+  state.history = saved?.history || [];
+  state.moveLog = saved?.moveLog || [];
   state.selectedColumn = null;
-  state.moves = 0;
+  state.moves = saved?.moves || 0;
   state.completed = false;
   state.dragFromColumn = null;
   winDialog.classList.add("hidden");
-  statusText.textContent = "Lift the top token from a column, then drop it onto another column with room.";
+  statusText.textContent = saved ? "Your exact board was restored. Continue from where you left off." : "Lift the top token from a column, then drop it onto another column with room.";
   renderLevelButtons();
   renderTargets();
   renderBoard();
+  updateMinimumDisplay();
 }
 
 function restartLevel() {
+  clearCurrentSave();
   loadLevel(state.levelIndex);
+  statusText.textContent = "Level restarted from the original scramble.";
 }
 
 function undoMove() {
@@ -523,20 +634,26 @@ function undoMove() {
   const previous = state.history.pop();
   state.board = cloneColumns(previous.board);
   state.moves = previous.moves;
+  state.moveLog = previous.moveLog || [];
   state.selectedColumn = null;
   state.dragFromColumn = null;
   winDialog.classList.add("hidden");
   statusText.textContent = "Move undone. Choose the top token from any column.";
+  playTone(220, 0.05);
+  saveCurrentBoard();
   renderBoard();
 }
 
 function newScramble() {
+  const pack = activePack();
   const salt = Date.now() % 100000;
-  const replacement = createLevel(state.levelIndex, salt);
-  levels[state.levelIndex] = replacement;
+  const replacement = createLevel(state.levelIndex, pack, salt);
+  levelsForPack()[state.levelIndex] = replacement;
+  clearCurrentSave();
   state.board = cloneColumns(replacement.board);
   state.target = cloneColumns(replacement.target);
   state.history = [];
+  state.moveLog = [];
   state.selectedColumn = null;
   state.moves = 0;
   state.completed = false;
@@ -544,31 +661,183 @@ function newScramble() {
   statusText.textContent = "Fresh scramble loaded. It was made by legal top-token moves, so it can be solved.";
   renderTargets();
   renderBoard();
+  updateMinimumDisplay();
 }
 
 function nextLevel() {
-  loadLevel((state.levelIndex + 1) % levelTotal);
+  const levels = levelsForPack();
+  loadLevel((state.levelIndex + 1) % levels.length);
 }
 
 function clearRecords() {
   state.records = {};
   state.progress = {};
-  saveRecords();
-  saveProgress();
+  state.saves = {};
+  saveJson(recordsKey, state.records);
+  saveJson(progressKey, state.progress);
+  saveJson(savesKey, state.saves);
   renderLevelButtons();
   updateStats();
-  statusText.textContent = "Personal records cleared on this device.";
+  statusText.textContent = "Personal records and saved boards cleared on this device.";
 }
 
+function showHint() {
+  if (state.completed) return;
+  clearHighlights();
+  const answer = findShortestSolution(state.board, state.target, 140000);
+  const move = answer?.[0] || bestLocalMove();
+  if (!move) {
+    statusText.textContent = "No hint found from this board. Restarting will always give a solvable setup.";
+    return;
+  }
+  document.querySelector(`.play-column[data-column="${move.from}"]`)?.classList.add("hint-source");
+  document.querySelector(`.play-column[data-column="${move.to}"]`)?.classList.add("hint-target");
+  statusText.textContent = `Hint: move the top token from column ${move.from + 1} to column ${move.to + 1}.`;
+}
+
+function bestLocalMove() {
+  const before = countMatches(state.board, state.target);
+  return legalMoves(state.board).sort((a, b) => {
+    const boardA = cloneColumns(state.board);
+    const boardB = cloneColumns(state.board);
+    applyMove(boardA, a.from, a.to);
+    applyMove(boardB, b.from, b.to);
+    return countMatches(boardB, state.target) - countMatches(boardA, state.target);
+  }).find((move) => {
+    const board = cloneColumns(state.board);
+    applyMove(board, move.from, move.to);
+    return countMatches(board, state.target) >= before;
+  }) || legalMoves(state.board)[0];
+}
+
+function boardKey(board) {
+  return board.map((column) => column.join("")).join("|");
+}
+
+function findShortestSolution(startBoard, target, maxStates = 120000) {
+  if (isSolved(startBoard, target)) return [];
+  const startKey = boardKey(startBoard);
+  const seen = new Set([startKey]);
+  const queue = [{ board: cloneColumns(startBoard), path: [] }];
+  let cursor = 0;
+  while (cursor < queue.length && seen.size < maxStates) {
+    const current = queue[cursor];
+    cursor += 1;
+    for (const move of legalMoves(current.board)) {
+      const nextBoard = cloneColumns(current.board);
+      applyMove(nextBoard, move.from, move.to);
+      const key = boardKey(nextBoard);
+      if (seen.has(key)) continue;
+      const path = [...current.path, move];
+      if (isSolved(nextBoard, target)) return path;
+      seen.add(key);
+      queue.push({ board: nextBoard, path });
+    }
+  }
+  return null;
+}
+
+async function shareResult() {
+  const level = levelsForPack()[state.levelIndex];
+  const record = state.records[levelKey()];
+  const text = `I played Token Columns ${activePack().name} ${state.levelIndex + 1}: ${state.moves} moves. Default record: ${level.defaultRecord}. Best: ${record ?? "--"}. ${liveUrl}`;
+  try {
+    if (navigator.share) await navigator.share({ title: "Token Columns", text, url: liveUrl });
+    else {
+      await navigator.clipboard.writeText(text);
+      statusText.textContent = "Result copied to the clipboard.";
+    }
+  } catch {
+    statusText.textContent = "Share was canceled.";
+  }
+}
+
+function playTone(frequency, duration) {
+  if (state.prefs.muted) return;
+  try {
+    audioContext ||= new AudioContext();
+    const oscillator = audioContext.createOscillator();
+    const gain = audioContext.createGain();
+    oscillator.frequency.value = frequency;
+    gain.gain.value = 0.035;
+    oscillator.connect(gain).connect(audioContext.destination);
+    oscillator.start();
+    oscillator.stop(audioContext.currentTime + duration);
+  } catch {
+    state.prefs.muted = true;
+    savePrefs();
+  }
+}
+
+function applyPrefs() {
+  document.body.dataset.theme = state.prefs.theme;
+  document.body.classList.toggle("symbols-on", state.prefs.symbols);
+  muteBtn.textContent = state.prefs.muted ? "Sound Off" : "Sound On";
+  symbolsBtn.textContent = state.prefs.symbols ? "Symbols On" : "Symbols Off";
+  themeSelect.value = state.prefs.theme;
+}
+
+async function installApp() {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    await deferredInstallPrompt.userChoice;
+    deferredInstallPrompt = null;
+    installText.textContent = "Shortcut prompt handled. You can launch Token Columns from your home screen if it was accepted.";
+    return;
+  }
+  installText.textContent = "On iPhone or iPad, tap Share, then Add to Home Screen. On Android, use the browser menu or install prompt.";
+}
+
+function setPack(packId) {
+  state.packId = packDefs.some((pack) => pack.id === packId) ? packId : "classic";
+  localStorage.setItem(packKey, state.packId);
+  packSelect.value = state.packId;
+  loadLevel(0);
+}
+
+window.addEventListener("beforeinstallprompt", (event) => {
+  event.preventDefault();
+  deferredInstallPrompt = event;
+  installText.textContent = "This device can add Token Columns as a home-screen app shortcut.";
+});
+
+packSelect.addEventListener("change", () => setPack(packSelect.value));
 restartBtn.addEventListener("click", restartLevel);
+mobileRestartBtn.addEventListener("click", restartLevel);
 undoBtn.addEventListener("click", undoMove);
+mobileUndoBtn.addEventListener("click", undoMove);
+hintBtn.addEventListener("click", showHint);
+mobileHintBtn.addEventListener("click", showHint);
 newScrambleBtn.addEventListener("click", newScramble);
 nextLevelBtn.addEventListener("click", nextLevel);
+shareBtn.addEventListener("click", shareResult);
+mobileShareBtn.addEventListener("click", shareResult);
 clearRecordsBtn.addEventListener("click", clearRecords);
+muteBtn.addEventListener("click", () => {
+  state.prefs.muted = !state.prefs.muted;
+  savePrefs();
+  applyPrefs();
+});
+symbolsBtn.addEventListener("click", () => {
+  state.prefs.symbols = !state.prefs.symbols;
+  savePrefs();
+  applyPrefs();
+  renderTargets();
+  renderBoard();
+});
+themeSelect.addEventListener("change", () => {
+  state.prefs.theme = themeSelect.value;
+  savePrefs();
+  applyPrefs();
+});
+installBtn.addEventListener("click", installApp);
 winNextBtn.addEventListener("click", nextLevel);
 winReplayBtn.addEventListener("click", restartLevel);
 winDialog.addEventListener("click", (event) => {
   if (event.target === winDialog) winDialog.classList.add("hidden");
 });
 
+if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
+packSelect.value = state.packId;
+applyPrefs();
 loadLevel(0);

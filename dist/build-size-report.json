@@ -1,0 +1,48 @@
+{
+  "limits": {
+    "initialBytes": 5242880,
+    "totalBytes": 8388608
+  },
+  "totals": {
+    "bytes": 82244,
+    "gzipBytes": 17609
+  },
+  "withinBudget": true,
+  "files": [
+    {
+      "path": "index.html",
+      "bytes": 6637,
+      "gzipBytes": 1902
+    },
+    {
+      "path": "styles.css",
+      "bytes": 17705,
+      "gzipBytes": 4370
+    },
+    {
+      "path": "game.js",
+      "bytes": 30896,
+      "gzipBytes": 7724
+    },
+    {
+      "path": "app-icon.svg",
+      "bytes": 328,
+      "gzipBytes": 184
+    },
+    {
+      "path": "qr-code.svg",
+      "bytes": 24974,
+      "gzipBytes": 2016
+    },
+    {
+      "path": "app-icon-180.png",
+      "bytes": 1303,
+      "gzipBytes": 1180
+    },
+    {
+      "path": "manifest.webmanifest",
+      "bytes": 401,
+      "gzipBytes": 233
+    }
+  ]
+}
