@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e7c27d">
+  <meta name="description" content="Lift top tokens between columns to match each color-card puzzle.">
+  <meta property="og:title" content="Token Columns">
+  <meta property="og:description" content="Lift the top token from one column and drop it onto another to match the target card.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Token Columns">
+  <meta name="twitter:description" content="A top-token column puzzle with 40 solvable levels and personal records.">
+  <title>Token Columns</title>
+  <link rel="stylesheet" href="styles.css?v=1">
+</head>
+<body>
+  <main class="app" aria-labelledby="gameTitle">
+    <section class="game-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Token Columns</p>
+          <h1 id="gameTitle">Match the color card.</h1>
+        </div>
+        <div class="timer-panel" aria-label="Stopwatch and best time">
+          <span class="timer-label">Time</span>
+          <strong id="timer">00:00.0</strong>
+          <span id="bestTime">Best --</span>
+        </div>
+      </header>
+
+      <section class="play-layout">
+        <aside class="level-panel" aria-label="Level selection">
+          <div class="level-head">
+            <span id="levelName">Level 1</span>
+            <span id="levelCount">1 / 40</span>
+          </div>
+          <div class="level-grid" id="levelGrid"></div>
+        </aside>
+
+        <section class="board-area" aria-label="Puzzle board">
+          <div class="target-card" aria-label="Target color columns">
+            <div class="ring-strip" aria-hidden="true">
+              <span></span><span></span>
+            </div>
+            <div class="target-grid" id="targetGrid"></div>
+          </div>
+
+          <div class="wood-board">
+            <div class="slots" id="slotGrid"></div>
+          </div>
+        </section>
+
+        <aside class="control-panel" aria-label="Game controls">
+          <div class="status-box">
+            <span class="status-label">Goal</span>
+            <p id="statusText">Lift the top token from a column, then drop it onto another column with room.</p>
+          </div>
+          <div class="stats">
+            <div>
+              <span>Moves</span>
+              <strong id="moveCount">0</strong>
+            </div>
+            <div>
+              <span>Matched</span>
+              <strong id="matchedCount">0 / 16</strong>
+            </div>
+          </div>
+          <div class="actions">
+            <button class="primary" id="nextLevelBtn" type="button">Next Level</button>
+            <button id="restartBtn" type="button">Restart</button>
+            <button id="newScrambleBtn" type="button">New Scramble</button>
+            <button id="clearRecordsBtn" type="button">Clear Records</button>
+          </div>
+        </aside>
+      </section>
+    </section>
+  </main>
+
+  <div class="win-dialog hidden" id="winDialog" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <div class="win-card">
+      <p class="eyebrow">Complete</p>
+      <h2 id="winTitle">Level solved</h2>
+      <p id="winSummary"></p>
+      <div class="actions horizontal">
+        <button class="primary" id="winNextBtn" type="button">Next Level</button>
+        <button id="winReplayBtn" type="button">Replay</button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="game.js?v=1"></script>
+</body>
+</html>

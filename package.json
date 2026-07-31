@@ -1,0 +1,12 @@
+{
+  "name": "color-sort",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build-static-site.mjs && node build-size-report.mjs",
+    "size": "node build-size-report.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.1"
+  }
+}
