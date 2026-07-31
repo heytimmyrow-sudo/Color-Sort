@@ -11,6 +11,7 @@ const targetHeight = 4;
 const columnCount = 4;
 const columnCapacity = 6;
 const recordKey = "tokenColumnsRecords";
+const progressKey = "tokenColumnsProgress";
 const state = {
   levelIndex: 0,
   board: [],
@@ -22,7 +23,8 @@ const state = {
   timerId: null,
   completed: false,
   dragFromColumn: null,
-  records: loadRecords()
+  records: loadStoredMap(recordKey),
+  progress: loadStoredMap(progressKey)
 };
 
 let pointerDrag = null;
@@ -159,9 +161,9 @@ function isSolved(board, target) {
   return board.every((column) => column.length === targetHeight) && countMatches(board, target) === columnCount * targetHeight;
 }
 
-function loadRecords() {
+function loadStoredMap(key) {
   try {
-    const records = JSON.parse(localStorage.getItem(recordKey) || "{}");
+    const records = JSON.parse(localStorage.getItem(key) || "{}");
     return records && typeof records === "object" ? records : {};
   } catch {
     return {};
@@ -170,6 +172,10 @@ function loadRecords() {
 
 function saveRecords() {
   localStorage.setItem(recordKey, JSON.stringify(state.records));
+}
+
+function saveProgress() {
+  localStorage.setItem(progressKey, JSON.stringify(state.progress));
 }
 
 function formatTime(milliseconds) {
@@ -186,6 +192,11 @@ function currentElapsed() {
 
 function startTimer() {
   if (state.startTime || state.completed) return;
+  if (state.records[state.levelIndex] === undefined && !state.progress[state.levelIndex]) {
+    state.progress[state.levelIndex] = true;
+    saveProgress();
+    renderLevelButtons();
+  }
   state.startTime = performance.now();
   state.timerId = window.setInterval(updateTimer, 100);
   updateTimer();
@@ -220,7 +231,16 @@ function renderLevelButtons() {
     button.textContent = String(index + 1);
     button.setAttribute("aria-label", `Level ${index + 1}`);
     if (index === state.levelIndex) button.classList.add("active");
-    if (state.records[index] !== undefined) button.classList.add("solved");
+    if (state.records[index] !== undefined) {
+      button.classList.add("solved");
+      button.setAttribute("title", "Completed");
+    } else if (state.progress[index]) {
+      button.classList.add("in-progress");
+      button.setAttribute("title", "In progress");
+    } else {
+      button.classList.add("not-attempted");
+      button.setAttribute("title", "Not attempted");
+    }
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
   });
@@ -494,6 +514,8 @@ function checkSolved() {
     state.records[state.levelIndex] = elapsed;
     saveRecords();
   }
+  delete state.progress[state.levelIndex];
+  saveProgress();
   renderLevelButtons();
   updateStats();
   winSummary.textContent = `${formatTime(elapsed)} in ${state.moves} moves.${isRecord ? " New personal record." : ""}`;
@@ -543,7 +565,9 @@ function nextLevel() {
 
 function clearRecords() {
   state.records = {};
+  state.progress = {};
   saveRecords();
+  saveProgress();
   renderLevelButtons();
   updateStats();
   statusText.textContent = "Personal records cleared on this device.";

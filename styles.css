@@ -171,25 +171,29 @@ h1 {
   min-height: 34px;
   padding: 0;
   border-radius: 7px;
-  background: #f6ead7;
+  background: #fffdf8;
   font-size: 13px;
 }
 
 .level-button.active {
   border-color: #201a16;
-  background: #201a16;
-  color: #fff8e8;
+  box-shadow: inset 0 0 0 2px #201a16, inset 0 -2px rgba(80, 52, 31, .12);
+}
+
+.level-button.in-progress {
+  background: #f3d856;
+  border-color: #b89b20;
+  color: #201a16;
+}
+
+.level-button.solved {
+  background: #3fab4d;
+  border-color: #277735;
+  color: #fff;
 }
 
 .level-button.solved::after {
-  content: "";
-  display: inline-block;
-  width: 6px;
-  height: 6px;
-  margin-left: 4px;
-  border-radius: 50%;
-  background: var(--green);
-  vertical-align: middle;
+  content: none;
 }
 
 .board-area {

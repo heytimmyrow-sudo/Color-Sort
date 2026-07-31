@@ -4,7 +4,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 const initialFiles = [
   "index.html",
   "styles.css",
-  "game.js"
+  "game.js",
+  "app-icon.svg"
 ];
 const limits = {
   initialBytes: 5 * 1024 * 1024,

@@ -3,7 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 const textFileNames = [
   "index.html",
   "styles.css",
-  "game.js"
+  "game.js",
+  "app-icon.svg"
 ];
 
 const textFiles = Object.fromEntries(await Promise.all(
@@ -15,7 +16,8 @@ const worker = `const textFiles = ${JSON.stringify(textFiles)};
 const contentTypes = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
-  "game.js": "text/javascript; charset=utf-8"
+  "game.js": "text/javascript; charset=utf-8",
+  "app-icon.svg": "image/svg+xml; charset=utf-8"
 };
 
 export default {
