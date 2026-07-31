@@ -317,9 +317,24 @@ h1 {
   box-shadow: inset 0 6px 10px rgba(74, 47, 24, .24), inset 0 -3px 7px rgba(255,255,255,.28);
 }
 
+.wood-board::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  left: clamp(54px, 10vw, 96px);
+  right: clamp(54px, 10vw, 96px);
+  top: clamp(38px, 6vw, 58px);
+  height: 22px;
+  border-radius: 14px;
+  background:
+    linear-gradient(180deg, rgba(255, 242, 204, .28), transparent 50%),
+    linear-gradient(90deg, rgba(54, 32, 14, .28), rgba(137, 95, 51, .78), rgba(54, 32, 14, .28));
+  box-shadow: inset 0 4px 7px rgba(48, 29, 13, .26), inset 0 -3px rgba(255, 244, 210, .18);
+}
+
 .slots {
   position: relative;
-  z-index: 1;
+  z-index: 2;
 }
 
 .play-column {
@@ -518,36 +533,105 @@ h1 {
 
 @media (max-width: 640px) {
   .app {
-    padding: 10px;
+    padding: 8px 10px 10px;
     place-items: start center;
   }
 
+  .game-shell {
+    gap: 8px;
+  }
+
   .topbar {
-    align-items: stretch;
-    flex-direction: column;
+    align-items: center;
+    flex-direction: row;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+  }
+
+  h1 {
+    font-size: 22px;
+    line-height: 1.02;
   }
 
   .timer-panel {
-    width: 100%;
-    text-align: left;
+    width: auto;
+    min-width: 122px;
+    padding: 8px 10px;
+    text-align: right;
+  }
+
+  .timer-panel strong {
+    font-size: 21px;
+  }
+
+  .board-area {
+    overflow: visible;
   }
 
   .target-card {
+    padding-block: 12px 10px;
     padding-inline: 18px;
   }
 
+  .target-grid {
+    gap: 6px;
+  }
+
+  .target-column {
+    gap: 5px;
+  }
+
+  .target-token {
+    width: clamp(28px, 8vw, 36px);
+  }
+
   .display-base {
+    position: sticky;
+    top: max(8px, env(safe-area-inset-top));
+    z-index: 12;
     padding-inline: 0;
-    padding-bottom: 16px;
+    padding-bottom: 10px;
+    filter: drop-shadow(0 9px 14px rgba(56, 39, 20, .14));
+  }
+
+  .display-base::before {
+    height: 52px;
+  }
+
+  .display-base::after {
+    bottom: 7px;
+    height: 13px;
   }
 
   .hanger-block {
     width: 70px;
-    height: 62px;
+    height: 48px;
+  }
+
+  .ring-strip {
+    top: -15px;
+  }
+
+  .ring-strip span {
+    width: 24px;
+    height: 42px;
+    border-width: 6px;
   }
 
   .wood-board {
-    padding: 24px 14px;
+    margin-top: 8px;
+    padding: 18px 14px 20px;
+  }
+
+  .wood-board::after {
+    left: 38px;
+    right: 38px;
+    top: 27px;
+    height: 18px;
   }
 
   .target-grid,
@@ -556,15 +640,15 @@ h1 {
   }
 
   .play-column {
-    min-height: 430px;
+    min-height: min(59vh, 390px);
   }
 
   .slot {
-    min-height: 64px;
+    min-height: 58px;
   }
 
   .token {
-    width: clamp(54px, 19vw, 76px);
+    width: clamp(48px, 18vw, 68px);
   }
 
   .level-grid {
