@@ -9,8 +9,9 @@ Players lift only the top token from a column and drop it onto another column wi
 - 40 generated levels
 - Six-token column capacity for extra working space
 - Legal top-token movement by click/tap or drag
-- Stopwatch for each level
-- Personal best records saved in local browser storage
+- Move count for each level
+- Personal best move records saved in local browser storage
+- Gold level buttons when the default move record is beaten
 - Static site build with no server dependency
 
 ## Run Locally

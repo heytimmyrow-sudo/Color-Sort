@@ -18,9 +18,6 @@ const state = {
   target: [],
   selectedColumn: null,
   moves: 0,
-  startTime: null,
-  elapsedBeforeStart: 0,
-  timerId: null,
   completed: false,
   dragFromColumn: null,
   records: loadStoredMap(recordKey),
@@ -35,8 +32,8 @@ const slotGrid = document.querySelector("#slotGrid");
 const levelGrid = document.querySelector("#levelGrid");
 const levelName = document.querySelector("#levelName");
 const levelCount = document.querySelector("#levelCount");
-const timer = document.querySelector("#timer");
-const bestTime = document.querySelector("#bestTime");
+const recordTarget = document.querySelector("#recordTarget");
+const bestMoves = document.querySelector("#bestMoves");
 const moveCount = document.querySelector("#moveCount");
 const matchedCount = document.querySelector("#matchedCount");
 const statusText = document.querySelector("#statusText");
@@ -126,7 +123,8 @@ function createLevel(index, salt = 0) {
   if (!isSolved(proofBoard, target)) {
     throw new Error(`Generated level ${index + 1} is not solvable`);
   }
-  return { target, board, solution };
+  const defaultRecord = solution.length + 5 + Math.floor(random() * 6);
+  return { target, board, solution, defaultRecord };
 }
 
 function legalMoves(board) {
@@ -178,48 +176,13 @@ function saveProgress() {
   localStorage.setItem(progressKey, JSON.stringify(state.progress));
 }
 
-function formatTime(milliseconds) {
-  const minutes = Math.floor(milliseconds / 60000);
-  const seconds = Math.floor((milliseconds % 60000) / 1000);
-  const tenths = Math.floor((milliseconds % 1000) / 100);
-  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}.${tenths}`;
-}
-
-function currentElapsed() {
-  if (!state.startTime) return state.elapsedBeforeStart;
-  return state.elapsedBeforeStart + performance.now() - state.startTime;
-}
-
-function startTimer() {
-  if (state.startTime || state.completed) return;
+function markInProgress() {
+  if (state.completed) return;
   if (state.records[state.levelIndex] === undefined && !state.progress[state.levelIndex]) {
     state.progress[state.levelIndex] = true;
     saveProgress();
     renderLevelButtons();
   }
-  state.startTime = performance.now();
-  state.timerId = window.setInterval(updateTimer, 100);
-  updateTimer();
-}
-
-function stopTimer() {
-  if (state.timerId) window.clearInterval(state.timerId);
-  state.timerId = null;
-  state.elapsedBeforeStart = currentElapsed();
-  state.startTime = null;
-  updateTimer();
-}
-
-function resetTimer() {
-  if (state.timerId) window.clearInterval(state.timerId);
-  state.timerId = null;
-  state.startTime = null;
-  state.elapsedBeforeStart = 0;
-  updateTimer();
-}
-
-function updateTimer() {
-  timer.textContent = formatTime(currentElapsed());
 }
 
 function renderLevelButtons() {
@@ -231,7 +194,10 @@ function renderLevelButtons() {
     button.textContent = String(index + 1);
     button.setAttribute("aria-label", `Level ${index + 1}`);
     if (index === state.levelIndex) button.classList.add("active");
-    if (state.records[index] !== undefined) {
+    if (state.records[index] !== undefined && state.records[index] < levels[index].defaultRecord) {
+      button.classList.add("gold-record");
+      button.setAttribute("title", "Default record beaten");
+    } else if (state.records[index] !== undefined) {
       button.classList.add("solved");
       button.setAttribute("title", "Completed");
     } else if (state.progress[index]) {
@@ -343,7 +309,7 @@ function handlePointerMove(event) {
   const distance = Math.hypot(pointerDrag.x - pointerDrag.startX, pointerDrag.y - pointerDrag.startY);
 
   if (!pointerDrag.active && distance > 8) {
-    startTimer();
+    markInProgress();
     pointerDrag.active = true;
     suppressNextClick = true;
     document.body.classList.add("pointer-dragging");
@@ -419,7 +385,7 @@ function handleDragStart(event, columnIndex) {
     event.preventDefault();
     return;
   }
-  startTimer();
+  markInProgress();
   state.dragFromColumn = columnIndex;
   event.dataTransfer.effectAllowed = "move";
   event.dataTransfer.setData("text/plain", String(columnIndex));
@@ -451,7 +417,7 @@ function selectOrMove(columnIndex) {
       statusText.textContent = "That column is empty. Choose a column with a top token.";
       return;
     }
-    startTimer();
+    markInProgress();
     state.selectedColumn = columnIndex;
     statusText.textContent = "Now choose the column where that top token should drop.";
     renderBoard();
@@ -484,7 +450,7 @@ function moveTopToken(fromColumn, toColumn) {
     return;
   }
 
-  startTimer();
+  markInProgress();
   applyMove(state.board, fromColumn, toColumn);
   state.selectedColumn = null;
   state.moves += 1;
@@ -495,30 +461,32 @@ function moveTopToken(fromColumn, toColumn) {
 
 function updateStats() {
   const matches = countMatches(state.board, state.target);
+  const level = levels[state.levelIndex];
   moveCount.textContent = String(state.moves);
   matchedCount.textContent = `${matches} / ${columnCount * targetHeight}`;
   levelName.textContent = `Level ${state.levelIndex + 1}`;
   levelCount.textContent = `${state.levelIndex + 1} / ${levelTotal}`;
   const record = state.records[state.levelIndex];
-  bestTime.textContent = record === undefined ? "Best --" : `Best ${formatTime(record)}`;
+  recordTarget.textContent = `${level.defaultRecord} moves`;
+  bestMoves.textContent = record === undefined ? "Best --" : `Best ${record}`;
 }
 
 function checkSolved() {
   if (!isSolved(state.board, state.target)) return;
   state.completed = true;
-  stopTimer();
-  const elapsed = Math.round(currentElapsed());
   const previous = state.records[state.levelIndex];
-  const isRecord = previous === undefined || elapsed < previous;
+  const isRecord = previous === undefined || state.moves < previous;
   if (isRecord) {
-    state.records[state.levelIndex] = elapsed;
+    state.records[state.levelIndex] = state.moves;
     saveRecords();
   }
   delete state.progress[state.levelIndex];
   saveProgress();
   renderLevelButtons();
   updateStats();
-  winSummary.textContent = `${formatTime(elapsed)} in ${state.moves} moves.${isRecord ? " New personal record." : ""}`;
+  const defaultRecord = levels[state.levelIndex].defaultRecord;
+  const defaultMessage = state.moves < defaultRecord ? " You beat the default record." : ` Default record: ${defaultRecord} moves.`;
+  winSummary.textContent = `${state.moves} moves.${isRecord ? " New personal best." : ""}${defaultMessage}`;
   winDialog.classList.remove("hidden");
 }
 
@@ -531,7 +499,6 @@ function loadLevel(index) {
   state.moves = 0;
   state.completed = false;
   state.dragFromColumn = null;
-  resetTimer();
   winDialog.classList.add("hidden");
   statusText.textContent = "Lift the top token from a column, then drop it onto another column with room.";
   renderLevelButtons();
@@ -552,7 +519,6 @@ function newScramble() {
   state.selectedColumn = null;
   state.moves = 0;
   state.completed = false;
-  resetTimer();
   winDialog.classList.add("hidden");
   statusText.textContent = "Fresh scramble loaded. It was made by legal top-token moves, so it can be solved.";
   renderTargets();

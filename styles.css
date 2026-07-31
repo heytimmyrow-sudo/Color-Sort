@@ -97,7 +97,7 @@ h1 {
   font-size: clamp(34px, 6vw, 72px);
 }
 
-.timer-panel {
+.record-panel {
   min-width: 154px;
   padding: 12px 14px;
   border-radius: 8px;
@@ -106,8 +106,8 @@ h1 {
   text-align: right;
 }
 
-.timer-label,
-.timer-panel span:last-child,
+.record-label,
+.record-panel span:last-child,
 .status-label,
 .stats span {
   display: block;
@@ -117,14 +117,14 @@ h1 {
   text-transform: uppercase;
 }
 
-.timer-panel strong {
+.record-panel strong {
   display: block;
   margin: 2px 0;
   font-variant-numeric: tabular-nums;
   font-size: 28px;
 }
 
-.timer-panel span:last-child {
+.record-panel span:last-child {
   color: #e6d7be;
   text-transform: none;
 }
@@ -190,6 +190,13 @@ h1 {
   background: #3fab4d;
   border-color: #277735;
   color: #fff;
+}
+
+.level-button.gold-record {
+  background: linear-gradient(180deg, #ffe98a, #dca923);
+  border-color: #9b7411;
+  color: #201a16;
+  box-shadow: inset 0 -2px rgba(112, 75, 7, .2), 0 0 0 2px rgba(255, 239, 150, .45);
 }
 
 .level-button.solved::after {
@@ -561,14 +568,14 @@ h1 {
     line-height: 1.02;
   }
 
-  .timer-panel {
+  .record-panel {
     width: auto;
     min-width: 122px;
     padding: 8px 10px;
     text-align: right;
   }
 
-  .timer-panel strong {
+  .record-panel strong {
     font-size: 21px;
   }
 
