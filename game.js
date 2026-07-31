@@ -16,6 +16,7 @@ const state = {
   levelIndex: 0,
   board: [],
   target: [],
+  history: [],
   selectedColumn: null,
   moves: 0,
   completed: false,
@@ -38,6 +39,7 @@ const moveCount = document.querySelector("#moveCount");
 const matchedCount = document.querySelector("#matchedCount");
 const statusText = document.querySelector("#statusText");
 const restartBtn = document.querySelector("#restartBtn");
+const undoBtn = document.querySelector("#undoBtn");
 const newScrambleBtn = document.querySelector("#newScrambleBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
 const clearRecordsBtn = document.querySelector("#clearRecordsBtn");
@@ -451,6 +453,10 @@ function moveTopToken(fromColumn, toColumn) {
   }
 
   markInProgress();
+  state.history.push({
+    board: cloneColumns(state.board),
+    moves: state.moves
+  });
   applyMove(state.board, fromColumn, toColumn);
   state.selectedColumn = null;
   state.moves += 1;
@@ -469,6 +475,7 @@ function updateStats() {
   const record = state.records[state.levelIndex];
   recordTarget.textContent = `${level.defaultRecord} moves`;
   bestMoves.textContent = record === undefined ? "Best --" : `Best ${record}`;
+  undoBtn.disabled = state.history.length === 0 || state.completed;
 }
 
 function checkSolved() {
@@ -495,6 +502,7 @@ function loadLevel(index) {
   state.levelIndex = index;
   state.board = cloneColumns(level.board);
   state.target = cloneColumns(level.target);
+  state.history = [];
   state.selectedColumn = null;
   state.moves = 0;
   state.completed = false;
@@ -510,12 +518,25 @@ function restartLevel() {
   loadLevel(state.levelIndex);
 }
 
+function undoMove() {
+  if (state.completed || state.history.length === 0) return;
+  const previous = state.history.pop();
+  state.board = cloneColumns(previous.board);
+  state.moves = previous.moves;
+  state.selectedColumn = null;
+  state.dragFromColumn = null;
+  winDialog.classList.add("hidden");
+  statusText.textContent = "Move undone. Choose the top token from any column.";
+  renderBoard();
+}
+
 function newScramble() {
   const salt = Date.now() % 100000;
   const replacement = createLevel(state.levelIndex, salt);
   levels[state.levelIndex] = replacement;
   state.board = cloneColumns(replacement.board);
   state.target = cloneColumns(replacement.target);
+  state.history = [];
   state.selectedColumn = null;
   state.moves = 0;
   state.completed = false;
@@ -540,6 +561,7 @@ function clearRecords() {
 }
 
 restartBtn.addEventListener("click", restartLevel);
+undoBtn.addEventListener("click", undoMove);
 newScrambleBtn.addEventListener("click", newScramble);
 nextLevelBtn.addEventListener("click", nextLevel);
 clearRecordsBtn.addEventListener("click", clearRecords);
