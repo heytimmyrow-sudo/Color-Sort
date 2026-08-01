@@ -19,6 +19,7 @@ const liveUrl = window.location.origin;
 const tutorialLevelCount = 5;
 const defaultProfileId = "player-1";
 const campaignPackIds = ["classic", "starter", "challenge", "expert"];
+const skipCoinCost = 50;
 
 const packDefs = [
   { id: "classic", name: "Classic", total: 40, seed: 90210, extra: 0 },
@@ -134,6 +135,8 @@ const tutorialBtn = document.querySelector("#tutorialBtn");
 const hintBtn = document.querySelector("#hintBtn");
 const newScrambleBtn = document.querySelector("#newScrambleBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
+const skipAdBtn = document.querySelector("#skipAdBtn");
+const skipCoinsBtn = document.querySelector("#skipCoinsBtn");
 const shareBtn = document.querySelector("#shareBtn");
 const clearRecordsBtn = document.querySelector("#clearRecordsBtn");
 const muteBtn = document.querySelector("#muteBtn");
@@ -381,6 +384,23 @@ function pokiCall(method) {
     if (api && typeof api[method] === "function") api[method]();
   } catch {
     // Poki is optional on the public web build.
+  }
+}
+
+function rewardedAdsAvailable() {
+  return typeof window.PokiSDK?.rewardedBreak === "function";
+}
+
+async function showRewardedAd() {
+  try {
+    if (!rewardedAdsAvailable()) return false;
+    stopGameplaySession();
+    const result = await window.PokiSDK.rewardedBreak();
+    startGameplaySession();
+    return result === true || result?.success === true;
+  } catch {
+    startGameplaySession();
+    return false;
   }
 }
 
@@ -652,6 +672,7 @@ function renderLevelButtons() {
   renderPackOptions();
   coinCount.textContent = String(state.coins);
   hardcoreStatus.textContent = hardcoreUnlocked() ? "Hardcore unlocked" : "Hardcore unlocks when Classic, Starter, Challenge, and Expert are complete.";
+  updateSkipControls();
   const levels = levelsForPack();
   levelGrid.innerHTML = "";
   levels.forEach((level, index) => {
@@ -690,6 +711,15 @@ function renderLevelButtons() {
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
   });
+}
+
+function updateSkipControls() {
+  const levels = levelsForPack();
+  const canSkip = levels.length > 1 && state.levelIndex < levels.length - 1 && !state.completed;
+  skipAdBtn.disabled = !canSkip || !rewardedAdsAvailable();
+  skipCoinsBtn.disabled = !canSkip || state.coins < skipCoinCost;
+  skipAdBtn.title = rewardedAdsAvailable() ? "Watch a rewarded ad to unlock the next level." : "Ads are not available in this version yet.";
+  skipCoinsBtn.title = state.coins >= skipCoinCost ? "Spend 50 coins to unlock the next level." : `You need ${skipCoinCost} coins to skip.`;
 }
 
 function renderPackOptions() {
@@ -1214,6 +1244,65 @@ function nextLevel() {
   loadLevel(nextIndex);
 }
 
+function unlockNextForSkip() {
+  const levels = levelsForPack();
+  if (levels.length <= 1 || state.levelIndex >= levels.length - 1) {
+    statusText.textContent = "There is no next level to skip to in this pack.";
+    return false;
+  }
+  const key = levelKey();
+  state.progress[key] = "skipped";
+  delete state.saves[key];
+  if (unlockedIndex() <= state.levelIndex) {
+    state.unlocks[state.packId] = state.levelIndex + 1;
+  }
+  state.selectedColumn = null;
+  state.completed = false;
+  state.history = [];
+  state.moveLog = [];
+  saveProfileState();
+  renderLevelButtons();
+  return true;
+}
+
+function finishSkip(method) {
+  if (!unlockNextForSkip()) return;
+  const nextIndex = state.levelIndex + 1;
+  loadLevel(nextIndex);
+  statusText.textContent = method === "ad" ? "Ad watched. Level skipped, but it does not count as completed." : `${skipCoinCost} coins spent. Level skipped, but it does not count as completed.`;
+}
+
+async function skipWithAd() {
+  if (state.completed) return;
+  if (!rewardedAdsAvailable()) {
+    statusText.textContent = "Ads are not available here yet. You can skip with 50 coins.";
+    updateSkipControls();
+    return;
+  }
+  statusText.textContent = "Opening rewarded ad...";
+  const watched = await showRewardedAd();
+  if (!watched) {
+    statusText.textContent = "Ad was not completed. The level was not skipped.";
+    updateSkipControls();
+    return;
+  }
+  finishSkip("ad");
+}
+
+function skipWithCoins() {
+  if (state.completed) return;
+  if (state.coins < skipCoinCost) {
+    statusText.textContent = `You need ${skipCoinCost} coins to skip this level.`;
+    updateSkipControls();
+    return;
+  }
+  state.coins -= skipCoinCost;
+  saveProfileState();
+  renderAchievements();
+  renderShop();
+  finishSkip("coins");
+}
+
 function clearRecords() {
   state.records = {};
   state.progress = {};
@@ -1411,6 +1500,8 @@ hintBtn.addEventListener("click", showHint);
 mobileHintBtn.addEventListener("click", showHint);
 newScrambleBtn.addEventListener("click", newScramble);
 nextLevelBtn.addEventListener("click", nextLevel);
+skipAdBtn.addEventListener("click", skipWithAd);
+skipCoinsBtn.addEventListener("click", skipWithCoins);
 shareBtn.addEventListener("click", shareResult);
 mobileShareBtn.addEventListener("click", shareResult);
 clearRecordsBtn.addEventListener("click", clearRecords);
