@@ -108,6 +108,8 @@ let suppressNextClick = false;
 let deferredInstallPrompt = null;
 let audioContext = null;
 let pokiGameplayStarted = false;
+let pokiInitialized = false;
+let pokiInitPromise = null;
 
 const targetGrid = document.querySelector("#targetGrid");
 const slotGrid = document.querySelector("#slotGrid");
@@ -387,15 +389,56 @@ function pokiCall(method) {
   }
 }
 
+function waitForPokiSdk(timeout = 900) {
+  if (window.PokiSDK) return Promise.resolve(window.PokiSDK);
+  return new Promise((resolve) => {
+    const started = performance.now();
+    const timer = window.setInterval(() => {
+      if (window.PokiSDK) {
+        window.clearInterval(timer);
+        resolve(window.PokiSDK);
+        return;
+      }
+      if (performance.now() - started >= timeout) {
+        window.clearInterval(timer);
+        resolve(null);
+      }
+    }, 50);
+  });
+}
+
+function initPoki() {
+  if (pokiInitPromise) return pokiInitPromise;
+  pokiInitPromise = waitForPokiSdk().then((api) => {
+    if (!api) return false;
+    if (typeof api.init !== "function") {
+      pokiInitialized = true;
+      return true;
+    }
+    return api.init().then(() => {
+      pokiInitialized = true;
+      return true;
+    }).catch(() => {
+      pokiInitialized = false;
+      return false;
+    });
+  });
+  return pokiInitPromise;
+}
+
 function rewardedAdsAvailable() {
-  return typeof window.PokiSDK?.rewardedBreak === "function";
+  return pokiInitialized && typeof window.PokiSDK?.rewardedBreak === "function";
 }
 
 async function showRewardedAd() {
   try {
+    await initPoki();
     if (!rewardedAdsAvailable()) return false;
     stopGameplaySession();
-    const result = await window.PokiSDK.rewardedBreak();
+    const result = await window.PokiSDK.rewardedBreak({
+      size: "medium",
+      onStart: () => stopGameplaySession()
+    });
     startGameplaySession();
     return result === true || result?.success === true;
   } catch {
@@ -1538,16 +1581,22 @@ tutorialDialog.addEventListener("click", (event) => {
   if (event.target === tutorialDialog) hideTutorial();
 });
 
-if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
-if (!packAvailable(state.packId)) state.packId = "classic";
-packSelect.value = state.packId;
-applyPrefs();
-pokiCall("gameLoadingStart");
-hydrateUnlocksFromRecords();
-renderProfiles();
-renderAchievements();
-renderShop();
-loadLevel(0);
-evaluateAchievements();
-pokiCall("gameLoadingFinished");
-if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
+async function startApp() {
+  if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
+  if (!packAvailable(state.packId)) state.packId = "classic";
+  packSelect.value = state.packId;
+  applyPrefs();
+  await initPoki();
+  pokiCall("gameLoadingStart");
+  hydrateUnlocksFromRecords();
+  renderProfiles();
+  renderAchievements();
+  renderShop();
+  loadLevel(0);
+  evaluateAchievements();
+  updateSkipControls();
+  pokiCall("gameLoadingFinished");
+  if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
+}
+
+startApp();
