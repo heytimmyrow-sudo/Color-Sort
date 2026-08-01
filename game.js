@@ -168,6 +168,10 @@ const mobileHintBtn = document.querySelector("#mobileHintBtn");
 const mobileShareBtn = document.querySelector("#mobileShareBtn");
 const winDialog = document.querySelector("#winDialog");
 const winSummary = document.querySelector("#winSummary");
+const winStars = document.querySelector("#winStars");
+const winMoves = document.querySelector("#winMoves");
+const winCoins = document.querySelector("#winCoins");
+const winRecord = document.querySelector("#winRecord");
 const winNextBtn = document.querySelector("#winNextBtn");
 const winReplayBtn = document.querySelector("#winReplayBtn");
 const tutorialDialog = document.querySelector("#tutorialDialog");
@@ -1157,6 +1161,7 @@ function moveTopToken(fromColumn, toColumn) {
   state.lastMove = { from: fromColumn, to: toColumn };
   statusText.textContent = "Good. Keep moving only the top tokens until the four shown positions match.";
   playTone(392, 0.06);
+  haptic([10]);
   saveCurrentBoard();
   evaluateAchievements();
   renderBoard();
@@ -1167,6 +1172,23 @@ function moveTopToken(fromColumn, toColumn) {
     }
   }, 420);
   checkSolved();
+}
+
+function coinRewardFromAchievements(achievements) {
+  return achievements.reduce((total, achievement) => total + achievement.coins, 0);
+}
+
+function renderWinRewards({ stars, moves, isRecord, defaultRecord, coinReward }) {
+  winStars.innerHTML = "";
+  for (let index = 0; index < 3; index += 1) {
+    const star = document.createElement("span");
+    star.textContent = "*";
+    star.className = index < stars ? "earned" : "";
+    winStars.append(star);
+  }
+  winMoves.textContent = String(moves);
+  winCoins.textContent = coinReward > 0 ? `+${coinReward}` : "+0";
+  winRecord.textContent = moves < defaultRecord ? "Gold" : (isRecord ? "Best" : "Set");
 }
 
 function updateStats() {
@@ -1220,16 +1242,18 @@ function checkSolved() {
   delete state.progress[key];
   delete state.saves[key];
   const earnedAchievements = evaluateAchievements();
+  const coinReward = coinRewardFromAchievements(earnedAchievements) + (dailyReward?.reward || 0);
   saveProfileState();
   renderLevelButtons();
   renderAchievements();
   renderShop();
   updateStats();
-  playTone(659, 0.08);
-  window.setTimeout(() => playTone(880, 0.12), 90);
+  haptic([22, 35, 38]);
+  playWinJingle();
   document.querySelector(".wood-board")?.classList.add("celebrate");
-  window.setTimeout(() => document.querySelector(".wood-board")?.classList.remove("celebrate"), 700);
+  window.setTimeout(() => document.querySelector(".wood-board")?.classList.remove("celebrate"), 950);
   const defaultRecord = level.defaultRecord;
+  renderWinRewards({ stars: earnedStars, moves: state.moves, isRecord, defaultRecord, coinReward });
   const recordWord = state.moves < defaultRecord ? "Gold record beaten." : `Default record: ${defaultRecord} moves.`;
   const paceWord = state.moves < defaultRecord ? " Great route." : "";
   const unlockWord = state.levelIndex < levelsForPack().length - 1 ? ` Level ${state.levelIndex + 2} unlocked.` : " Pack complete.";
@@ -1514,6 +1538,21 @@ function playTone(frequency, duration) {
   } catch {
     state.prefs.muted = true;
     savePrefs();
+  }
+}
+
+function playWinJingle() {
+  playTone(523, 0.07);
+  window.setTimeout(() => playTone(659, 0.08), 75);
+  window.setTimeout(() => playTone(784, 0.1), 155);
+  window.setTimeout(() => playTone(1047, 0.13), 250);
+}
+
+function haptic(pattern) {
+  try {
+    if (navigator.vibrate && !state.prefs.muted) navigator.vibrate(pattern);
+  } catch {
+    // Vibration is optional and not available on every device.
   }
 }
 

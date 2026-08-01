@@ -1084,6 +1084,61 @@ body[data-board-style="space"] {
   line-height: 1.4;
 }
 
+.win-stars {
+  display: flex;
+  gap: 7px;
+  margin: 14px 0 10px;
+  color: rgba(32, 26, 22, .2);
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.win-stars span {
+  transform: scale(.82);
+}
+
+.win-stars .earned {
+  color: #d79912;
+  text-shadow: 0 2px 0 #fff1a6, 0 7px 16px rgba(112, 72, 8, .25);
+  animation: star-pop .52s cubic-bezier(.2, .9, .25, 1.22) both;
+}
+
+.win-stars .earned:nth-child(2) { animation-delay: .08s; }
+.win-stars .earned:nth-child(3) { animation-delay: .16s; }
+
+.win-rewards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 10px 0 12px;
+}
+
+.win-rewards div {
+  min-width: 0;
+  padding: 10px 8px;
+  border-radius: 8px;
+  background: #f5ead8;
+  box-shadow: inset 0 -2px rgba(80, 52, 31, .08);
+}
+
+.win-rewards span {
+  display: block;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.win-rewards strong {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink);
+  font-size: 21px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
 .win-burst {
   position: absolute;
   inset: 0;
@@ -1102,6 +1157,10 @@ body[data-board-style="space"] {
 .win-burst span:nth-child(2) { right: 18%; top: 20%; background: var(--yellow); animation-delay: .05s; }
 .win-burst span:nth-child(3) { left: 28%; bottom: 18%; background: var(--green); animation-delay: .1s; }
 .win-burst span:nth-child(4) { right: 24%; bottom: 20%; background: var(--blue); animation-delay: .15s; }
+.win-burst span:nth-child(5) { left: 8%; top: 54%; background: var(--yellow); animation-delay: .2s; }
+.win-burst span:nth-child(6) { right: 9%; top: 55%; background: var(--red); animation-delay: .24s; }
+.win-burst span:nth-child(7) { left: 45%; bottom: 6%; background: var(--blue); animation-delay: .28s; }
+.win-burst span:nth-child(8) { left: 48%; top: 8%; background: var(--green); animation-delay: .32s; }
 
 .wood-board.celebrate .token {
   animation: token-pop .52s ease-in-out both;
@@ -1111,6 +1170,12 @@ body[data-board-style="space"] {
   0% { transform: translateY(0) scale(1); }
   45% { transform: translateY(-10px) scale(1.08); }
   100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes star-pop {
+  0% { transform: translateY(10px) scale(.25) rotate(-12deg); opacity: 0; }
+  65% { transform: translateY(-3px) scale(1.15) rotate(4deg); opacity: 1; }
+  100% { transform: translateY(0) scale(1) rotate(0); opacity: 1; }
 }
 
 @keyframes token-land {
