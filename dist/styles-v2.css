@@ -270,12 +270,27 @@ h1 {
 }
 
 .level-button {
+  display: grid;
+  place-items: center;
+  gap: 1px;
   min-width: 0;
-  min-height: 34px;
+  min-height: 40px;
   padding: 0;
   border-radius: 7px;
   background: #fffdf8;
   font-size: 13px;
+}
+
+.level-number {
+  line-height: 1;
+}
+
+.level-stars {
+  min-height: 11px;
+  color: rgba(32, 26, 22, .72);
+  font-size: 9px;
+  font-weight: 950;
+  line-height: 1;
 }
 
 .level-button.active {
@@ -293,6 +308,12 @@ h1 {
   background: #3fab4d;
   border-color: #277735;
   color: #fff;
+}
+
+.level-button.solved .level-stars,
+.level-button.gold-record .level-stars {
+  color: inherit;
+  text-shadow: 0 1px 1px rgba(63, 37, 5, .45);
 }
 
 .level-button.gold-record {
@@ -320,6 +341,22 @@ h1 {
 
 .level-button.solved::after {
   content: none;
+}
+
+.level-button.locked {
+  color: rgba(32, 26, 22, .38);
+  background: #eadfce;
+  border-color: rgba(75, 54, 33, .12);
+  box-shadow: none;
+}
+
+.level-button.locked .level-stars {
+  color: rgba(32, 26, 22, .35);
+  font-size: 7px;
+}
+
+.level-button.locked.active {
+  box-shadow: inset 0 0 0 1px rgba(32, 26, 22, .16);
 }
 
 .board-area {

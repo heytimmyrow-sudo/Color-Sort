@@ -10,6 +10,8 @@ const savesKey = "tokenColumnsSavesV3";
 const prefsKey = "tokenColumnsPrefsV2";
 const packKey = "tokenColumnsPackV2";
 const tutorialKey = "tokenColumnsTutorialSeenV1";
+const starsKey = "tokenColumnsStarsV1";
+const unlocksKey = "tokenColumnsUnlocksV1";
 const liveUrl = window.location.origin;
 
 const packDefs = [
@@ -18,6 +20,18 @@ const packDefs = [
   { id: "challenge", name: "Challenge", total: 45, seed: 120303, extra: 12 },
   { id: "expert", name: "Expert", total: 50, seed: 421337, extra: 25 },
   { id: "daily", name: "Daily", total: 1, seed: dailySeed(), extra: 16 }
+];
+const handAuthoredScrambles = [
+  [{ from: 0, to: 1 }],
+  [{ from: 0, to: 1 }, { from: 2, to: 3 }],
+  [{ from: 0, to: 1 }, { from: 2, to: 3 }, { from: 1, to: 2 }],
+  [{ from: 0, to: 1 }, { from: 2, to: 3 }, { from: 3, to: 0 }, { from: 1, to: 2 }],
+  [{ from: 0, to: 1 }, { from: 2, to: 3 }, { from: 1, to: 2 }, { from: 3, to: 0 }, { from: 2, to: 3 }],
+  [{ from: 1, to: 0 }, { from: 2, to: 3 }, { from: 0, to: 2 }, { from: 3, to: 1 }, { from: 2, to: 3 }, { from: 1, to: 0 }],
+  [{ from: 0, to: 2 }, { from: 1, to: 3 }, { from: 2, to: 1 }, { from: 3, to: 0 }, { from: 1, to: 2 }, { from: 0, to: 3 }, { from: 2, to: 1 }],
+  [{ from: 3, to: 2 }, { from: 0, to: 1 }, { from: 2, to: 0 }, { from: 1, to: 3 }, { from: 0, to: 2 }, { from: 3, to: 1 }, { from: 2, to: 0 }, { from: 1, to: 3 }],
+  [{ from: 0, to: 1 }, { from: 2, to: 3 }, { from: 1, to: 2 }, { from: 3, to: 0 }, { from: 2, to: 3 }, { from: 0, to: 1 }, { from: 3, to: 2 }, { from: 1, to: 0 }, { from: 2, to: 3 }],
+  [{ from: 1, to: 2 }, { from: 3, to: 0 }, { from: 2, to: 3 }, { from: 0, to: 1 }, { from: 3, to: 2 }, { from: 1, to: 0 }, { from: 2, to: 1 }, { from: 0, to: 3 }, { from: 1, to: 2 }, { from: 3, to: 0 }]
 ];
 
 const levelCache = new Map();
@@ -36,6 +50,8 @@ const state = {
   records: loadStoredMap(recordsKey),
   progress: loadStoredMap(progressKey),
   saves: loadStoredMap(savesKey),
+  stars: loadStoredMap(starsKey),
+  unlocks: { classic: 0, starter: 0, challenge: 0, expert: 0, daily: 0, ...loadStoredMap(unlocksKey) },
   prefs: { muted: false, symbols: false, theme: "toy", ...loadStoredMap(prefsKey) }
 };
 
@@ -43,6 +59,7 @@ let pointerDrag = null;
 let suppressNextClick = false;
 let deferredInstallPrompt = null;
 let audioContext = null;
+let pokiGameplayStarted = false;
 
 const targetGrid = document.querySelector("#targetGrid");
 const slotGrid = document.querySelector("#slotGrid");
@@ -131,6 +148,46 @@ function levelKey(index = state.levelIndex) {
   return `${state.packId}:${index}`;
 }
 
+function unlockedIndex(packId = state.packId) {
+  return Math.max(0, Number(state.unlocks[packId] || 0));
+}
+
+function isUnlocked(index, packId = state.packId) {
+  return index <= unlockedIndex(packId);
+}
+
+function saveUnlocks() {
+  saveJson(unlocksKey, state.unlocks);
+}
+
+function hydrateUnlocksFromRecords() {
+  for (const pack of packDefs) {
+    let unlocked = unlockedIndex(pack.id);
+    const levels = levelsForPack(pack);
+    for (let index = 0; index < pack.total; index += 1) {
+      const key = `${pack.id}:${index}`;
+      const record = state.records[key];
+      if (record !== undefined) {
+        unlocked = Math.max(unlocked, index + 1);
+        if (!state.stars[key]) state.stars[key] = starsForMoves(record, levels[index]);
+      }
+    }
+    state.unlocks[pack.id] = Math.min(unlocked, pack.total - 1);
+  }
+  saveJson(starsKey, state.stars);
+  saveUnlocks();
+}
+
+function starsForMoves(moves, level) {
+  if (moves < level.defaultRecord) return 3;
+  if (moves <= level.defaultRecord + 8) return 2;
+  return 1;
+}
+
+function starText(count) {
+  return count > 0 ? "*".repeat(count) : "";
+}
+
 function createTarget(random, levelIndex, pack) {
   const bag = colorOrder.flatMap((color) => Array(targetHeight).fill(color));
   let target = toColumns(shuffle(bag, random));
@@ -142,7 +199,34 @@ function createTarget(random, levelIndex, pack) {
   return target;
 }
 
+function starterTarget() {
+  return Array.from({ length: columnCount }, (_, columnIndex) => {
+    return [...colorOrder.slice(columnIndex), ...colorOrder.slice(0, columnIndex)];
+  });
+}
+
+function createHandAuthoredLevel(index) {
+  const target = starterTarget();
+  const board = target.map((column) => [...column].reverse());
+  const scrambleMoves = handAuthoredScrambles[index];
+  scrambleMoves.forEach((move) => applyMove(board, move.from, move.to));
+  const solution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
+  const proofBoard = cloneColumns(board);
+  solution.forEach((move) => applyMove(proofBoard, move.from, move.to));
+  if (!isSolved(proofBoard, target)) throw new Error(`Hand-authored level ${index + 1} is not solvable`);
+  return {
+    target,
+    board,
+    solution,
+    defaultRecord: solution.length + 5,
+    difficulty: difficultyFor(solution.length)
+  };
+}
+
 function createLevel(index, pack, salt = 0) {
+  if (salt === 0 && (pack.id === "classic" || pack.id === "starter") && index < handAuthoredScrambles.length) {
+    return createHandAuthoredLevel(index);
+  }
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
   const target = createTarget(random, index, pack);
   let board = target.map((column) => [...column].reverse());
@@ -175,6 +259,27 @@ function createLevel(index, pack, salt = 0) {
     defaultRecord: solution.length + 5 + Math.floor(random() * 6),
     difficulty: difficultyFor(solution.length)
   };
+}
+
+function pokiCall(method) {
+  try {
+    const api = window.PokiSDK;
+    if (api && typeof api[method] === "function") api[method]();
+  } catch {
+    // Poki is optional on the public web build.
+  }
+}
+
+function startGameplaySession() {
+  if (pokiGameplayStarted) return;
+  pokiGameplayStarted = true;
+  pokiCall("gameplayStart");
+}
+
+function stopGameplaySession() {
+  if (!pokiGameplayStarted) return;
+  pokiGameplayStarted = false;
+  pokiCall("gameplayStop");
 }
 
 function legalMoves(board) {
@@ -264,18 +369,30 @@ function renderLevelButtons() {
   levelGrid.innerHTML = "";
   levels.forEach((level, index) => {
     const key = levelKey(index);
+    const unlocked = isUnlocked(index);
+    const starCount = Number(state.stars[key] || 0);
     const button = document.createElement("button");
     button.className = "level-button";
     button.type = "button";
-    button.textContent = String(index + 1);
+    button.disabled = !unlocked;
+    const number = document.createElement("span");
+    number.className = "level-number";
+    number.textContent = String(index + 1);
+    const stars = document.createElement("span");
+    stars.className = "level-stars";
+    stars.textContent = unlocked ? starText(starCount) : "LOCK";
+    button.append(number, stars);
     button.setAttribute("aria-label", `${activePack().name} level ${index + 1}, ${level.difficulty}`);
     if (index === state.levelIndex) button.classList.add("active");
-    if (state.records[key] !== undefined && state.records[key] < level.defaultRecord) {
+    if (!unlocked) {
+      button.classList.add("locked");
+      button.title = "Locked";
+    } else if (starCount >= 3 || (state.records[key] !== undefined && state.records[key] < level.defaultRecord)) {
       button.classList.add("gold-record");
-      button.title = "Default move record beaten";
+      button.title = "3-star clear";
     } else if (state.records[key] !== undefined) {
       button.classList.add("solved");
-      button.title = "Completed";
+      button.title = starCount === 1 ? "Completed with 1 star" : "Completed with 2 stars";
     } else if (state.progress[key]) {
       button.classList.add("in-progress");
       button.title = "In progress";
@@ -534,6 +651,7 @@ function selectOrMove(columnIndex) {
 
 function moveTopToken(fromColumn, toColumn) {
   if (state.completed || fromColumn === toColumn) return;
+  startGameplaySession();
   clearHighlights();
   if (state.board[fromColumn].length === 0) {
     state.selectedColumn = null;
@@ -584,7 +702,7 @@ function updateStats() {
   bestMoves.textContent = record === undefined ? "Best --" : `Best ${record}`;
   undoBtn.disabled = state.history.length === 0 || state.completed;
   mobileUndoBtn.disabled = undoBtn.disabled;
-  nextLevelBtn.disabled = levels.length === 1;
+  nextLevelBtn.disabled = levels.length === 1 || !isUnlocked((state.levelIndex + 1) % levels.length);
 }
 
 function updateMinimumDisplay() {
@@ -600,12 +718,21 @@ function updateMinimumDisplay() {
 function checkSolved() {
   if (!isSolved(state.board, state.target)) return;
   state.completed = true;
+  stopGameplaySession();
   const key = levelKey();
   const previous = state.records[key];
   const isRecord = previous === undefined || state.moves < previous;
+  const level = levelsForPack()[state.levelIndex];
+  const earnedStars = starsForMoves(state.moves, level);
   if (isRecord) {
     state.records[key] = state.moves;
     saveJson(recordsKey, state.records);
+  }
+  state.stars[key] = Math.max(Number(state.stars[key] || 0), earnedStars);
+  saveJson(starsKey, state.stars);
+  if (state.levelIndex < levelsForPack().length - 1 && unlockedIndex() <= state.levelIndex) {
+    state.unlocks[state.packId] = state.levelIndex + 1;
+    saveUnlocks();
   }
   delete state.progress[key];
   delete state.saves[key];
@@ -617,15 +744,22 @@ function checkSolved() {
   window.setTimeout(() => playTone(880, 0.12), 90);
   document.querySelector(".wood-board")?.classList.add("celebrate");
   window.setTimeout(() => document.querySelector(".wood-board")?.classList.remove("celebrate"), 700);
-  const defaultRecord = levelsForPack()[state.levelIndex].defaultRecord;
+  const defaultRecord = level.defaultRecord;
   const recordWord = state.moves < defaultRecord ? "Gold record beaten." : `Default record: ${defaultRecord} moves.`;
   const paceWord = state.moves < defaultRecord ? " Great route." : "";
-  winSummary.textContent = `${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}`;
+  const unlockWord = state.levelIndex < levelsForPack().length - 1 ? ` Level ${state.levelIndex + 2} unlocked.` : " Pack complete.";
+  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${unlockWord}`;
   winDialog.classList.remove("hidden");
 }
 
 function loadLevel(index) {
   const levels = levelsForPack();
+  if (!isUnlocked(index)) {
+    statusText.textContent = `Level ${index + 1} is locked. Clear level ${unlockedIndex() + 1} to keep going.`;
+    renderLevelButtons();
+    return;
+  }
+  stopGameplaySession();
   const level = levels[index] || levels[0];
   state.levelIndex = Math.min(index, levels.length - 1);
   const saved = state.saves[levelKey(state.levelIndex)];
@@ -647,6 +781,7 @@ function loadLevel(index) {
 }
 
 function restartLevel() {
+  stopGameplaySession();
   clearCurrentSave();
   loadLevel(state.levelIndex);
   statusText.textContent = "Level restarted from the original scramble.";
@@ -669,6 +804,7 @@ function undoMove() {
 }
 
 function newScramble() {
+  stopGameplaySession();
   const pack = activePack();
   const salt = Date.now() % 100000;
   const replacement = createLevel(state.levelIndex, pack, salt);
@@ -691,16 +827,25 @@ function newScramble() {
 
 function nextLevel() {
   const levels = levelsForPack();
-  loadLevel((state.levelIndex + 1) % levels.length);
+  const nextIndex = (state.levelIndex + 1) % levels.length;
+  if (!isUnlocked(nextIndex)) {
+    statusText.textContent = "Finish this level to unlock the next one.";
+    return;
+  }
+  loadLevel(nextIndex);
 }
 
 function clearRecords() {
   state.records = {};
   state.progress = {};
   state.saves = {};
+  state.stars = {};
+  state.unlocks = { classic: 0, starter: 0, challenge: 0, expert: 0, daily: 0 };
   saveJson(recordsKey, state.records);
   saveJson(progressKey, state.progress);
   saveJson(savesKey, state.saves);
+  saveJson(starsKey, state.stars);
+  saveUnlocks();
   renderLevelButtons();
   updateStats();
   statusText.textContent = "Personal records and saved boards cleared on this device.";
@@ -806,6 +951,7 @@ function playTone(frequency, duration) {
   if (state.prefs.muted) return;
   try {
     audioContext ||= new AudioContext();
+    audioContext.resume?.();
     const oscillator = audioContext.createOscillator();
     const gain = audioContext.createGain();
     oscillator.frequency.value = frequency;
@@ -842,8 +988,12 @@ function setPack(packId) {
   state.packId = packDefs.some((pack) => pack.id === packId) ? packId : "classic";
   localStorage.setItem(packKey, state.packId);
   packSelect.value = state.packId;
-  loadLevel(0);
+  loadLevel(Math.min(unlockedIndex(), levelsForPack().length - 1));
 }
+
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) stopGameplaySession();
+});
 
 window.addEventListener("beforeinstallprompt", (event) => {
   event.preventDefault();
@@ -900,5 +1050,8 @@ tutorialDialog.addEventListener("click", (event) => {
 if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
 packSelect.value = state.packId;
 applyPrefs();
+pokiCall("gameLoadingStart");
+hydrateUnlocksFromRecords();
 loadLevel(0);
+pokiCall("gameLoadingFinished");
 if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
