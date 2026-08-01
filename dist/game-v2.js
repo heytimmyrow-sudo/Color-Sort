@@ -367,7 +367,8 @@ function createHandAuthoredLevel(index) {
   const board = target.map((column) => [...column].reverse());
   const scrambleMoves = handAuthoredScrambles[index];
   scrambleMoves.forEach((move) => applyMove(board, move.from, move.to));
-  const solution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
+  const fallbackSolution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
+  const solution = findShortestSolution(board, target, 90000) || fallbackSolution;
   const proofBoard = cloneColumns(board);
   solution.forEach((move) => applyMove(proofBoard, move.from, move.to));
   if (!isSolved(proofBoard, target)) throw new Error(`Hand-authored level ${index + 1} is not solvable`);
@@ -381,19 +382,19 @@ function createHandAuthoredLevel(index) {
 }
 
 function createLevel(index, pack, salt = 0) {
-  if (salt === 0 && (pack.id === "classic" || pack.id === "starter") && index < handAuthoredScrambles.length) {
+  if (salt === 0 && (pack.id === "classic" || pack.id === "starter") && index < tutorialLevelCount) {
     return createHandAuthoredLevel(index);
   }
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
   const target = createTarget(random, index, pack);
   let board = target.map((column) => [...column].reverse());
-  const moveCountGoal = Math.max(12, 20 + index + pack.extra + Math.floor(random() * 12));
+  const moveCountGoal = Math.max(16, minimumSolutionLength(index, pack) + 12 + Math.floor(random() * 14));
   let lastMove = null;
   const scrambleMoves = [];
 
   for (let step = 0; step < moveCountGoal; step += 1) {
     const choices = legalMoves(board).filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
-    const move = choices[Math.floor(random() * choices.length)] || legalMoves(board)[0];
+    const move = chooseScrambleMove(board, target, choices.length ? choices : legalMoves(board), random, step, moveCountGoal);
     applyMove(board, move.from, move.to);
     scrambleMoves.push(move);
     lastMove = move;
@@ -416,6 +417,29 @@ function createLevel(index, pack, salt = 0) {
     defaultRecord: solution.length + 3 + Math.floor(random() * 3),
     difficulty: difficultyFor(solution.length)
   };
+}
+
+function chooseScrambleMove(board, target, choices, random, step, moveCountGoal) {
+  const currentMatches = countMatches(board, target);
+  const scored = choices.map((move) => {
+    const nextBoard = cloneColumns(board);
+    applyMove(nextBoard, move.from, move.to);
+    return { move, matches: countMatches(nextBoard, target) };
+  }).sort((a, b) => a.matches - b.matches);
+  const awayMoves = scored.filter((item) => item.matches <= currentMatches);
+  const pool = step < moveCountGoal * 0.75 && awayMoves.length ? awayMoves : scored;
+  const spread = Math.max(1, Math.ceil(pool.length * 0.45));
+  return pool[Math.floor(random() * spread)].move;
+}
+
+function minimumSolutionLength(index, pack) {
+  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(18 + Math.floor((index - tutorialLevelCount) * 0.55), 36);
+  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(12 + Math.floor((index - tutorialLevelCount) * 0.45), 24);
+  if (pack.id === "challenge") return Math.min(24 + Math.floor(index * 0.55), 46);
+  if (pack.id === "expert") return Math.min(34 + Math.floor(index * 0.65), 62);
+  if (pack.id === "hardcore") return Math.min(44 + Math.floor(index * 0.7), 78);
+  if (pack.id === "daily") return 28;
+  return 16;
 }
 
 function pokiCall(method) {
