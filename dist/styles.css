@@ -624,6 +624,15 @@ h1 {
   min-height: 62px;
 }
 
+.blocked-slot::after {
+  content: "";
+  width: clamp(36px, 7vw, 54px);
+  height: 7px;
+  border-radius: 999px;
+  background: rgba(91, 64, 31, .3);
+  box-shadow: inset 0 2px 3px rgba(45, 28, 10, .25), 0 1px rgba(255, 248, 221, .35);
+}
+
 .token {
   display: block;
   width: clamp(58px, 10vw, 88px);

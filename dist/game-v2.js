@@ -348,7 +348,7 @@ function tutorialStatus(index = state.levelIndex) {
 function createTarget(random, levelIndex, pack) {
   const bag = colorOrder.flatMap((color) => Array(targetHeight).fill(color));
   let target = toColumns(shuffle(bag, random));
-  if (pack.id === "starter" || (pack.id === "classic" && levelIndex < 8)) {
+  if ((pack.id === "starter" || pack.id === "classic") && levelIndex < tutorialLevelCount) {
     target = Array.from({ length: columnCount }, (_, columnIndex) => {
       return [...colorOrder.slice(columnIndex), ...colorOrder.slice(0, columnIndex)];
     });
@@ -376,6 +376,7 @@ function createHandAuthoredLevel(index) {
     target,
     board,
     solution,
+    capacities: Array(columnCount).fill(columnCapacity),
     defaultRecord: solution.length + 3 + (index % 3),
     difficulty: index < tutorialLevelCount ? "Tutorial" : difficultyFor(solution.length)
   };
@@ -387,23 +388,36 @@ function createLevel(index, pack, salt = 0) {
   }
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
   const target = createTarget(random, index, pack);
+  const capacities = capacitiesForLevel(index, pack);
   let board = target.map((column) => [...column].reverse());
   const moveCountGoal = Math.max(16, minimumSolutionLength(index, pack) + 12 + Math.floor(random() * 14));
   let lastMove = null;
   const scrambleMoves = [];
 
   for (let step = 0; step < moveCountGoal; step += 1) {
-    const choices = legalMoves(board).filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
-    const move = chooseScrambleMove(board, target, choices.length ? choices : legalMoves(board), random, step, moveCountGoal);
+    const legal = legalMoves(board, capacities);
+    const choices = legal.filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
+    const move = chooseScrambleMove(board, target, choices.length ? choices : legal, random, step, moveCountGoal);
     applyMove(board, move.from, move.to);
     scrambleMoves.push(move);
     lastMove = move;
   }
 
   if (isSolved(board, target)) {
-    const move = legalMoves(board)[0];
+    const move = legalMoves(board, capacities)[0];
     applyMove(board, move.from, move.to);
     scrambleMoves.push(move);
+  }
+
+  let extraStep = 0;
+  while (countMatches(board, target) > maxStartingMatches(index, pack) && extraStep < 70) {
+    const legal = legalMoves(board, capacities);
+    const choices = legal.filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
+    const move = chooseScrambleMove(board, target, choices.length ? choices : legal, random, 0, 1);
+    applyMove(board, move.from, move.to);
+    scrambleMoves.push(move);
+    lastMove = move;
+    extraStep += 1;
   }
 
   const solution = scrambleMoves.reverse().map((move) => ({ from: move.to, to: move.from }));
@@ -414,6 +428,7 @@ function createLevel(index, pack, salt = 0) {
     target,
     board,
     solution,
+    capacities,
     defaultRecord: solution.length + 3 + Math.floor(random() * 3),
     difficulty: difficultyFor(solution.length)
   };
@@ -427,19 +442,43 @@ function chooseScrambleMove(board, target, choices, random, step, moveCountGoal)
     return { move, matches: countMatches(nextBoard, target) };
   }).sort((a, b) => a.matches - b.matches);
   const awayMoves = scored.filter((item) => item.matches <= currentMatches);
-  const pool = step < moveCountGoal * 0.75 && awayMoves.length ? awayMoves : scored;
-  const spread = Math.max(1, Math.ceil(pool.length * 0.45));
+  const pool = step < moveCountGoal * 0.92 && awayMoves.length ? awayMoves : scored;
+  const spread = Math.max(1, Math.ceil(pool.length * 0.34));
   return pool[Math.floor(random() * spread)].move;
 }
 
+function maxStartingMatches(index, pack) {
+  if (pack.id === "classic" && index < tutorialLevelCount) return 15;
+  if (pack.id === "starter" && index < tutorialLevelCount) return 15;
+  if (pack.id === "starter") return 5;
+  if (pack.id === "classic") return index < 18 ? 4 : 3;
+  if (pack.id === "challenge") return 3;
+  if (pack.id === "expert") return 2;
+  if (pack.id === "hardcore") return 1;
+  if (pack.id === "daily") return 3;
+  return 5;
+}
+
 function minimumSolutionLength(index, pack) {
-  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(18 + Math.floor((index - tutorialLevelCount) * 0.55), 36);
-  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(12 + Math.floor((index - tutorialLevelCount) * 0.45), 24);
-  if (pack.id === "challenge") return Math.min(24 + Math.floor(index * 0.55), 46);
-  if (pack.id === "expert") return Math.min(34 + Math.floor(index * 0.65), 62);
-  if (pack.id === "hardcore") return Math.min(44 + Math.floor(index * 0.7), 78);
-  if (pack.id === "daily") return 28;
+  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(26 + Math.floor((index - tutorialLevelCount) * 0.7), 52);
+  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(20 + Math.floor((index - tutorialLevelCount) * 0.6), 36);
+  if (pack.id === "challenge") return Math.min(36 + Math.floor(index * 0.7), 66);
+  if (pack.id === "expert") return Math.min(50 + Math.floor(index * 0.75), 84);
+  if (pack.id === "hardcore") return Math.min(66 + Math.floor(index * 0.85), 108);
+  if (pack.id === "daily") return 42;
   return 16;
+}
+
+function capacitiesForLevel(index, pack) {
+  if (pack.id === "classic" && index < tutorialLevelCount) return [6, 6, 6, 6];
+  if (pack.id === "starter" && index < tutorialLevelCount) return [6, 6, 6, 6];
+  if (pack.id === "starter") return [5, 5, 6, 6];
+  if (pack.id === "classic") return index < 18 ? [5, 5, 5, 6] : [5, 5, 5, 5];
+  if (pack.id === "challenge") return [5, 5, 5, 5];
+  if (pack.id === "expert") return [5, 5, 5, 5];
+  if (pack.id === "hardcore") return [5, 5, 5, 5];
+  if (pack.id === "daily") return [4, 4, 5, 5];
+  return [6, 6, 6, 6];
 }
 
 function pokiCall(method) {
@@ -521,12 +560,16 @@ function stopGameplaySession() {
   pokiCall("gameplayStop");
 }
 
-function legalMoves(board) {
+function currentCapacities() {
+  return levelsForPack()[state.levelIndex]?.capacities || Array(columnCount).fill(columnCapacity);
+}
+
+function legalMoves(board, capacities = Array(columnCount).fill(columnCapacity)) {
   const moves = [];
   for (let from = 0; from < columnCount; from += 1) {
     if (board[from].length === 0) continue;
     for (let to = 0; to < columnCount; to += 1) {
-      if (from !== to && board[to].length < columnCapacity) moves.push({ from, to });
+      if (from !== to && board[to].length < capacities[to]) moves.push({ from, to });
     }
   }
   return moves;
@@ -908,16 +951,19 @@ function renderTargets() {
 
 function renderBoard() {
   slotGrid.innerHTML = "";
+  const capacities = currentCapacities();
   state.board.forEach((column, columnIndex) => {
+    const capacity = capacities[columnIndex] || columnCapacity;
     const columnEl = document.createElement("button");
     columnEl.className = "play-column";
     columnEl.type = "button";
     columnEl.dataset.column = columnIndex;
+    columnEl.dataset.capacity = capacity;
     columnEl.setAttribute("aria-label", columnLabel(columnIndex));
     if (state.selectedColumn === columnIndex) columnEl.classList.add("selected-column");
     if (state.lastMove?.from === columnIndex) columnEl.classList.add("last-source");
     if (state.lastMove?.to === columnIndex) columnEl.classList.add("last-target");
-    if (column.length < columnCapacity) columnEl.classList.add("can-receive");
+    if (column.length < capacity) columnEl.classList.add("can-receive");
     columnEl.addEventListener("click", () => selectOrMove(columnIndex));
 
     for (let visualRow = 0; visualRow < columnCapacity; visualRow += 1) {
@@ -927,6 +973,7 @@ function renderBoard() {
       slot.className = "slot";
       slot.dataset.column = columnIndex;
       slot.dataset.stackIndex = stackIndex;
+      if (stackIndex >= capacity) slot.classList.add("blocked-slot");
       if (color) {
         const token = document.createElement("span");
         token.className = `token ${color}`;
@@ -1062,6 +1109,7 @@ function movePointerGhost() {
 
 function nearestDropColumn(x, y) {
   if (!pointerDrag) return null;
+  const capacities = currentCapacities();
   const columns = [...document.querySelectorAll(".play-column")].map((element) => {
     const rect = element.getBoundingClientRect();
     const index = Number(element.dataset.column);
@@ -1070,7 +1118,7 @@ function nearestDropColumn(x, y) {
     return { element, rect, index, distance: Math.hypot(x - centerX, y - centerY) };
   }).filter((column) => {
     if (!Number.isInteger(column.index) || column.index === pointerDrag.fromColumn) return false;
-    if (state.board[column.index].length >= columnCapacity) return false;
+    if (state.board[column.index].length >= capacities[column.index]) return false;
     const verticalPad = Math.max(44, column.rect.height * 0.12);
     return y >= column.rect.top - verticalPad && y <= column.rect.bottom + verticalPad;
   });
@@ -1100,9 +1148,10 @@ function clearHighlights() {
 
 function columnLabel(columnIndex) {
   const column = state.board[columnIndex];
-  if (column.length === 0) return `Column ${columnIndex + 1}, empty`;
+  const capacity = currentCapacities()[columnIndex] || columnCapacity;
+  if (column.length === 0) return `Column ${columnIndex + 1}, empty, holds ${capacity}`;
   const topColor = column[column.length - 1];
-  return `Column ${columnIndex + 1}, ${column.length} tokens, top token is ${colorNames[topColor]}`;
+  return `Column ${columnIndex + 1}, ${column.length} of ${capacity} tokens, top token is ${colorNames[topColor]}`;
 }
 
 function handleDragStart(event, columnIndex) {
@@ -1168,7 +1217,7 @@ function moveTopToken(fromColumn, toColumn) {
     renderBoard();
     return;
   }
-  if (state.board[toColumn].length >= columnCapacity) {
+  if (state.board[toColumn].length >= currentCapacities()[toColumn]) {
     state.selectedColumn = null;
     statusText.textContent = "That column is full. Choose a column with open space.";
     renderBoard();
@@ -1235,13 +1284,49 @@ function updateStats() {
 }
 
 function updateMinimumDisplay() {
-  const level = levelsForPack()[state.levelIndex];
+  const levels = levelsForPack();
+  let level = levels[state.levelIndex];
+  const pack = activePack();
+  const index = state.levelIndex;
   minimumMoves.textContent = "Minimum checking";
   window.setTimeout(() => {
-    const answer = findShortestSolution(level.board, level.target, 160000);
+    let answer = findShortestSolution(level.board, level.target, 160000, level.capacities);
+    const floor = minimumAcceptableMoves(index, pack);
+    if (!isTutorialLevel(index, pack.id) && state.moves === 0 && answer && answer.length < floor) {
+      for (let salt = 1; salt <= 10; salt += 1) {
+        const replacement = createLevel(index, pack, salt + 1000);
+        const replacementAnswer = findShortestSolution(replacement.board, replacement.target, 160000, replacement.capacities);
+        if (!replacementAnswer || replacementAnswer.length >= floor) {
+          level = replacement;
+          answer = replacementAnswer;
+          levels[index] = replacement;
+          clearCurrentSave(index);
+          state.board = cloneColumns(replacement.board);
+          state.target = cloneColumns(replacement.target);
+          state.history = [];
+          state.moveLog = [];
+          state.selectedColumn = null;
+          state.lastMove = null;
+          renderTargets();
+          renderBoard();
+          statusText.textContent = "This level was sharpened into a tougher scramble.";
+          break;
+        }
+      }
+    }
     level.minimumMoves = answer ? answer.length : level.solution.length;
     minimumMoves.textContent = `Minimum ${level.minimumMoves}`;
   }, 20);
+}
+
+function minimumAcceptableMoves(index, pack) {
+  if (pack.id === "starter") return index < tutorialLevelCount ? 0 : 18;
+  if (pack.id === "classic") return index < tutorialLevelCount ? 0 : 24;
+  if (pack.id === "challenge") return 34;
+  if (pack.id === "expert") return 46;
+  if (pack.id === "hardcore") return 58;
+  if (pack.id === "daily") return 28;
+  return 18;
 }
 
 function checkSolved() {
@@ -1300,21 +1385,26 @@ function loadLevel(index) {
   const level = levels[index] || levels[0];
   state.levelIndex = Math.min(index, levels.length - 1);
   const saved = state.saves[levelKey(state.levelIndex)];
-  state.board = saved?.board ? cloneColumns(saved.board) : cloneColumns(level.board);
+  const canRestoreSave = saved?.board && boardFitsCapacities(saved.board, level.capacities);
+  state.board = canRestoreSave ? cloneColumns(saved.board) : cloneColumns(level.board);
   state.target = cloneColumns(level.target);
-  state.history = saved?.history || [];
-  state.moveLog = saved?.moveLog || [];
+  state.history = canRestoreSave ? saved?.history || [] : [];
+  state.moveLog = canRestoreSave ? saved?.moveLog || [] : [];
   state.selectedColumn = null;
   state.lastMove = null;
-  state.moves = saved?.moves || 0;
+  state.moves = canRestoreSave ? saved?.moves || 0 : 0;
   state.completed = false;
   state.dragFromColumn = null;
   winDialog.classList.add("hidden");
-  statusText.textContent = saved ? "Your exact board was restored. Continue from where you left off." : (isTutorialLevel() ? tutorialStatus() : "Lift the top token from a column, then drop it onto another column with room.");
+  statusText.textContent = canRestoreSave ? "Your exact board was restored. Continue from where you left off." : (isTutorialLevel() ? tutorialStatus() : "Lift the top token from a column, then drop it onto another column with room.");
   renderLevelButtons();
   renderTargets();
   renderBoard();
   updateMinimumDisplay();
+}
+
+function boardFitsCapacities(board, capacities = Array(columnCount).fill(columnCapacity)) {
+  return board.every((column, index) => column.length <= capacities[index]);
 }
 
 function restartLevel() {
@@ -1454,7 +1544,7 @@ function clearRecords() {
 function showHint() {
   if (state.completed) return;
   clearHighlights();
-  const answer = findShortestSolution(state.board, state.target, 140000);
+  const answer = findShortestSolution(state.board, state.target, 140000, currentCapacities());
   const move = answer?.[0] || bestLocalMove();
   if (!move) {
     statusText.textContent = "No hint found from this board. Restarting will always give a solvable setup.";
@@ -1477,7 +1567,8 @@ function hideTutorial() {
 
 function bestLocalMove() {
   const before = countMatches(state.board, state.target);
-  return legalMoves(state.board).sort((a, b) => {
+  const capacities = currentCapacities();
+  return legalMoves(state.board, capacities).sort((a, b) => {
     const boardA = cloneColumns(state.board);
     const boardB = cloneColumns(state.board);
     applyMove(boardA, a.from, a.to);
@@ -1487,14 +1578,14 @@ function bestLocalMove() {
     const board = cloneColumns(state.board);
     applyMove(board, move.from, move.to);
     return countMatches(board, state.target) >= before;
-  }) || legalMoves(state.board)[0];
+  }) || legalMoves(state.board, capacities)[0];
 }
 
 function boardKey(board) {
   return board.map((column) => column.join("")).join("|");
 }
 
-function findShortestSolution(startBoard, target, maxStates = 120000) {
+function findShortestSolution(startBoard, target, maxStates = 120000, capacities = Array(columnCount).fill(columnCapacity)) {
   if (isSolved(startBoard, target)) return [];
   const startKey = boardKey(startBoard);
   const seen = new Set([startKey]);
@@ -1503,7 +1594,7 @@ function findShortestSolution(startBoard, target, maxStates = 120000) {
   while (cursor < queue.length && seen.size < maxStates) {
     const current = queue[cursor];
     cursor += 1;
-    for (const move of legalMoves(current.board)) {
+    for (const move of legalMoves(current.board, capacities)) {
       const nextBoard = cloneColumns(current.board);
       applyMove(nextBoard, move.from, move.to);
       const key = boardKey(nextBoard);
