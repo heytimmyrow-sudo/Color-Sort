@@ -44,7 +44,9 @@ const achievementDefs = [
   { id: "expertClear", name: "Expert Clear", text: "Complete the Expert pack.", coins: 300, test: () => packComplete("expert") },
   { id: "hardcoreUnlock", name: "Hardcore Open", text: "Unlock Hardcore mode.", coins: 250, test: () => hardcoreUnlocked() },
   { id: "hardcoreFirst", name: "No Training Wheels", text: "Complete one Hardcore level.", coins: 200, test: () => completedCount("hardcore") >= 1 },
-  { id: "dailyDone", name: "Daily Drop", text: "Complete today's Daily level.", coins: 40, test: () => state.records["daily:0"] !== undefined },
+  { id: "dailyDone", name: "Daily Drop", text: "Complete today's Daily level.", coins: 40, test: () => state.records[recordKey("daily", 0)] !== undefined },
+  { id: "dailyStreak3", name: "Three-Day Run", text: "Complete Daily levels 3 days in a row.", coins: 100, test: () => state.stats.dailyStreak >= 3 },
+  { id: "dailyStreak7", name: "Daily Regular", text: "Complete Daily levels 7 days in a row.", coins: 250, test: () => state.stats.dailyStreak >= 7 },
   { id: "hundredMoves", name: "Hands Warm", text: "Make 100 total moves.", coins: 65, test: () => state.stats.totalMoves >= 100 },
   { id: "shopper", name: "Fresh Look", text: "Buy one shop item.", coins: 35, test: () => state.stats.shopPurchases >= 1 }
 ];
@@ -70,8 +72,16 @@ const defaultProfileState = {
   achievements: {},
   unlockedCosmetics: { "token-classic": true, "board-maple": true },
   cosmetics: { tokenStyle: "classic", boardStyle: "maple" },
-  stats: { totalMoves: 0, totalWins: 0, shopPurchases: 0 }
+  stats: { totalMoves: 0, totalWins: 0, shopPurchases: 0, dailyStreak: 0, bestDailyStreak: 0, lastDailyDate: "" }
 };
+
+const tutorialMessages = [
+  "Tutorial 1 of 5: drag or tap the top red token into column 1.",
+  "Tutorial 2 of 5: solve two easy top-token moves.",
+  "Tutorial 3 of 5: use the target card and fix one column at a time.",
+  "Tutorial 4 of 5: columns can hold extra tokens while you sort.",
+  "Tutorial 5 of 5: finish the warmup, then the real packs open up."
+];
 const handAuthoredScrambles = [
   [{ from: 0, to: 1 }],
   [{ from: 0, to: 1 }, { from: 2, to: 3 }],
@@ -169,6 +179,12 @@ function dailySeed() {
   return Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
 }
 
+function dailyId(offsetDays = 0) {
+  const date = new Date();
+  date.setDate(date.getDate() + offsetDays);
+  return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
 function mulberry32(seed) {
   return function next() {
     let value = seed += 0x6D2B79F5;
@@ -211,7 +227,12 @@ function levelsForPack(pack = activePack()) {
 }
 
 function levelKey(index = state.levelIndex) {
+  if (state.packId === "daily") return `daily:${dailyId()}:${index}`;
   return `${state.packId}:${index}`;
+}
+
+function recordKey(packId, index) {
+  return packId === "daily" ? `daily:${dailyId()}:${index}` : `${packId}:${index}`;
 }
 
 function unlockedIndex(packId = state.packId) {
@@ -247,6 +268,19 @@ function packAvailable(packId) {
   return packId !== "hardcore" || hardcoreUnlocked();
 }
 
+function updateDailyStreak() {
+  const today = dailyId();
+  if (state.stats.lastDailyDate === today) return null;
+  const yesterday = dailyId(-1);
+  const nextStreak = state.stats.lastDailyDate === yesterday ? Number(state.stats.dailyStreak || 0) + 1 : 1;
+  state.stats.dailyStreak = nextStreak;
+  state.stats.bestDailyStreak = Math.max(Number(state.stats.bestDailyStreak || 0), nextStreak);
+  state.stats.lastDailyDate = today;
+  const reward = 25 + Math.min(nextStreak, 7) * 5;
+  state.coins += reward;
+  return { streak: nextStreak, reward };
+}
+
 function saveUnlocks() {
   saveProfileState();
 }
@@ -256,7 +290,7 @@ function hydrateUnlocksFromRecords() {
     let unlocked = unlockedIndex(pack.id);
     const levels = levelsForPack(pack);
     for (let index = 0; index < pack.total; index += 1) {
-      const key = `${pack.id}:${index}`;
+      const key = recordKey(pack.id, index);
       const record = state.records[key];
       if (record !== undefined) {
         unlocked = Math.max(unlocked, index + 1);
@@ -304,7 +338,7 @@ function isTutorialLevel(index = state.levelIndex, packId = state.packId) {
 }
 
 function tutorialStatus(index = state.levelIndex) {
-  return `Tutorial ${index + 1} of ${tutorialLevelCount}: move only the top circle, then match the card.`;
+  return tutorialMessages[index] || `Tutorial ${index + 1} of ${tutorialLevelCount}: move only the top circle, then match the card.`;
 }
 
 function createTarget(random, levelIndex, pack) {
@@ -707,14 +741,15 @@ function saveCurrentBoard() {
 }
 
 function clearCurrentSave(index = state.levelIndex) {
-  delete state.saves[`${state.packId}:${index}`];
+  delete state.saves[levelKey(index)];
   saveProfileState();
 }
 
 function renderLevelButtons() {
   renderPackOptions();
   coinCount.textContent = String(state.coins);
-  hardcoreStatus.textContent = hardcoreUnlocked() ? "Hardcore unlocked" : "Hardcore unlocks when Classic, Starter, Challenge, and Expert are complete.";
+  const streakText = state.stats.dailyStreak ? ` Daily streak: ${state.stats.dailyStreak}.` : "";
+  hardcoreStatus.textContent = `${hardcoreUnlocked() ? "Hardcore unlocked" : "Hardcore unlocks after all main packs."}${streakText}`;
   updateSkipControls();
   const levels = levelsForPack();
   levelGrid.innerHTML = "";
@@ -1172,6 +1207,7 @@ function checkSolved() {
   const isRecord = previous === undefined || state.moves < previous;
   const level = levelsForPack()[state.levelIndex];
   const earnedStars = starsForMoves(state.moves, level);
+  const dailyReward = state.packId === "daily" && previous === undefined ? updateDailyStreak() : null;
   state.stats.totalWins += 1;
   if (isRecord) {
     state.records[key] = state.moves;
@@ -1198,9 +1234,10 @@ function checkSolved() {
   const paceWord = state.moves < defaultRecord ? " Great route." : "";
   const unlockWord = state.levelIndex < levelsForPack().length - 1 ? ` Level ${state.levelIndex + 2} unlocked.` : " Pack complete.";
   const tutorialWord = isTutorialLevel() ? ` Tutorial ${state.levelIndex + 1} complete.` : "";
+  const dailyWord = dailyReward ? ` Daily streak: ${dailyReward.streak}. Bonus: ${dailyReward.reward} coins.` : "";
   const achievementWord = earnedAchievements.length ? ` Achievements: ${earnedAchievements.map((achievement) => achievement.name).join(", ")}.` : "";
   const hardcoreWord = hardcoreUnlocked() ? " Hardcore mode is open." : "";
-  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${tutorialWord}${unlockWord}${hardcoreWord}${achievementWord}`;
+  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${tutorialWord}${dailyWord}${unlockWord}${hardcoreWord}${achievementWord}`;
   winDialog.classList.remove("hidden");
 }
 
