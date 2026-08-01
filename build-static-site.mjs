@@ -11,10 +11,17 @@ const textFileNames = [
 const binaryFileNames = [
   "app-icon-180.png"
 ];
+const aliases = {
+  "styles-v2.css": "styles.css",
+  "game-v2.js": "game.js"
+};
 
 const textFiles = Object.fromEntries(await Promise.all(
   textFileNames.map(async (name) => [name, await readFile(name, "utf8")])
 ));
+for (const [alias, source] of Object.entries(aliases)) {
+  textFiles[alias] = textFiles[source];
+}
 const binaryFiles = Object.fromEntries(await Promise.all(
   binaryFileNames.map(async (name) => [name, (await readFile(name)).toString("base64")])
 ));
@@ -25,7 +32,9 @@ const binaryFiles = ${JSON.stringify(binaryFiles)};
 const contentTypes = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
+  "styles-v2.css": "text/css; charset=utf-8",
   "game.js": "text/javascript; charset=utf-8",
+  "game-v2.js": "text/javascript; charset=utf-8",
   "app-icon.svg": "image/svg+xml; charset=utf-8",
   "qr-code.svg": "image/svg+xml; charset=utf-8",
   "app-icon-180.png": "image/png",
@@ -78,4 +87,5 @@ await mkdir("dist/server", { recursive: true });
 await mkdir("dist/.openai", { recursive: true });
 await writeFile("dist/server/index.js", worker);
 await Promise.all([...textFileNames, ...binaryFileNames].map((name) => copyFile(name, `dist/${name}`)));
+await Promise.all(Object.entries(aliases).map(([alias, source]) => copyFile(source, `dist/${alias}`)));
 await copyFile(".openai/hosting.json", "dist/.openai/hosting.json");

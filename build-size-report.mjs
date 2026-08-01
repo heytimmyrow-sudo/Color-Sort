@@ -4,7 +4,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 const initialFiles = [
   "index.html",
   "styles.css",
+  "styles-v2.css",
   "game.js",
+  "game-v2.js",
   "app-icon.svg",
   "qr-code.svg",
   "app-icon-180.png",
@@ -15,7 +17,7 @@ const limits = {
   totalBytes: 8 * 1024 * 1024
 };
 const files = await Promise.all(initialFiles.map(async (path) => {
-  const contents = await readFile(path);
+  const contents = await readFile(`dist/${path}`);
   return { path, bytes: contents.byteLength, gzipBytes: gzipSync(contents).byteLength };
 }));
 const totals = files.reduce((result, file) => ({
