@@ -1,0 +1,21 @@
+{
+  "name": "Token Columns",
+  "short_name": "Color Sort",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#fffaf0",
+  "theme_color": "#e7c27d",
+  "icons": [
+    {
+      "src": "app-icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

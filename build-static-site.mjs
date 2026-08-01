@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, writeFile } from "node:fs/promises";
 
 const textFileNames = [
   "index.html",
@@ -76,3 +76,4 @@ export default {
 
 await mkdir("dist/server", { recursive: true });
 await writeFile("dist/server/index.js", worker);
+await Promise.all([...textFileNames, ...binaryFileNames].map((name) => copyFile(name, `dist/${name}`)));
