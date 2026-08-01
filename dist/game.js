@@ -783,12 +783,6 @@ function renderBoard() {
     if (state.lastMove?.to === columnIndex) columnEl.classList.add("last-target");
     if (column.length < columnCapacity) columnEl.classList.add("can-receive");
     columnEl.addEventListener("click", () => selectOrMove(columnIndex));
-    columnEl.addEventListener("dragover", (event) => {
-      if (state.dragFromColumn !== null && state.dragFromColumn !== columnIndex && column.length < columnCapacity) event.preventDefault();
-    });
-    columnEl.addEventListener("dragenter", () => columnEl.classList.add("drop-target"));
-    columnEl.addEventListener("dragleave", () => columnEl.classList.remove("drop-target"));
-    columnEl.addEventListener("drop", (event) => handleDrop(event, columnIndex));
 
     for (let visualRow = 0; visualRow < columnCapacity; visualRow += 1) {
       const stackIndex = columnCapacity - 1 - visualRow;
@@ -812,9 +806,6 @@ function renderBoard() {
     if (topIndex >= 0) {
       const topSlot = columnEl.querySelector(`[data-stack-index="${topIndex}"]`);
       topSlot?.classList.add("top-token-slot");
-      topSlot?.setAttribute("draggable", "true");
-      topSlot?.addEventListener("dragstart", (event) => handleDragStart(event, columnIndex));
-      topSlot?.addEventListener("dragend", clearDragState);
       topSlot?.addEventListener("pointerdown", (event) => handlePointerDown(event, columnIndex));
     }
     slotGrid.append(columnEl);
@@ -842,15 +833,18 @@ function renderHistory() {
 
 function handlePointerDown(event, columnIndex) {
   if (state.completed || state.board[columnIndex].length === 0 || event.button > 0) return;
+  clearHighlights();
   const topColor = state.board[columnIndex][state.board[columnIndex].length - 1];
   pointerDrag = {
     fromColumn: columnIndex,
+    pointerId: event.pointerId,
     startX: event.clientX,
     startY: event.clientY,
     x: event.clientX,
     y: event.clientY,
     color: topColor,
     active: false,
+    dropColumn: null,
     ghost: null,
     target: event.currentTarget
   };
@@ -865,17 +859,7 @@ function handlePointerMove(event) {
   pointerDrag.x = event.clientX;
   pointerDrag.y = event.clientY;
   const distance = Math.hypot(pointerDrag.x - pointerDrag.startX, pointerDrag.y - pointerDrag.startY);
-  if (!pointerDrag.active && distance > 8) {
-    markInProgress();
-    pointerDrag.active = true;
-    suppressNextClick = true;
-    document.body.classList.add("pointer-dragging");
-    document.querySelector(`.play-column[data-column="${pointerDrag.fromColumn}"]`)?.classList.add("dragging-column");
-    pointerDrag.ghost = document.createElement("span");
-    pointerDrag.ghost.className = `drag-ghost ${pointerDrag.color}`;
-    pointerDrag.ghost.textContent = tokenText(pointerDrag.color);
-    document.body.append(pointerDrag.ghost);
-  }
+  if (!pointerDrag.active && distance > 4) startPointerDrag();
   if (!pointerDrag.active) return;
   event.preventDefault();
   movePointerGhost();
@@ -886,7 +870,7 @@ function handlePointerUp(event) {
   if (!pointerDrag) return;
   const drag = pointerDrag;
   const wasActive = drag.active;
-  const dropColumn = wasActive ? columnFromPoint(event.clientX, event.clientY) : null;
+  const dropColumn = wasActive ? nearestDropColumn(event.clientX, event.clientY) : null;
   cancelPointerDrag();
   if (wasActive) {
     if (dropColumn !== null) moveTopToken(drag.fromColumn, dropColumn);
@@ -894,7 +878,31 @@ function handlePointerUp(event) {
   }
 }
 
+function startPointerDrag() {
+  if (!pointerDrag || pointerDrag.active) return;
+  markInProgress();
+  pointerDrag.active = true;
+  suppressNextClick = true;
+  document.body.classList.add("pointer-dragging");
+  const sourceColumn = document.querySelector(`.play-column[data-column="${pointerDrag.fromColumn}"]`);
+  sourceColumn?.classList.add("dragging-column");
+  sourceColumn?.classList.add("lift-source");
+  pointerDrag.ghost = document.createElement("span");
+  pointerDrag.ghost.className = `drag-ghost ${pointerDrag.color}`;
+  pointerDrag.ghost.textContent = tokenText(pointerDrag.color);
+  pointerDrag.ghost.setAttribute("aria-hidden", "true");
+  document.body.append(pointerDrag.ghost);
+  movePointerGhost();
+}
+
 function cancelPointerDrag() {
+  if (pointerDrag?.pointerId !== undefined) {
+    try {
+      pointerDrag.target?.releasePointerCapture?.(pointerDrag.pointerId);
+    } catch {
+      // Some browsers release capture automatically on pointerup.
+    }
+  }
   pointerDrag?.target?.removeEventListener("pointermove", handlePointerMove);
   pointerDrag?.target?.removeEventListener("pointerup", handlePointerUp);
   pointerDrag?.target?.removeEventListener("pointercancel", cancelPointerDrag);
@@ -902,7 +910,12 @@ function cancelPointerDrag() {
   pointerDrag = null;
   document.body.classList.remove("pointer-dragging");
   clearHighlights();
-  document.querySelectorAll(".dragging-column").forEach((column) => column.classList.remove("dragging-column"));
+  document.querySelectorAll(".dragging-column,.lift-source,.invalid-drop").forEach((column) => {
+    column.classList.remove("dragging-column", "lift-source", "invalid-drop");
+  });
+  window.setTimeout(() => {
+    suppressNextClick = false;
+  }, 80);
 }
 
 function movePointerGhost() {
@@ -911,25 +924,41 @@ function movePointerGhost() {
   pointerDrag.ghost.style.top = `${pointerDrag.y}px`;
 }
 
-function columnFromPoint(x, y) {
-  const element = document.elementFromPoint(x, y);
-  const column = element?.closest?.(".play-column");
-  if (!column) return null;
-  const index = Number(column.dataset.column);
-  if (!Number.isInteger(index) || index === pointerDrag?.fromColumn || state.board[index].length >= columnCapacity) return null;
-  return index;
+function nearestDropColumn(x, y) {
+  if (!pointerDrag) return null;
+  const columns = [...document.querySelectorAll(".play-column")].map((element) => {
+    const rect = element.getBoundingClientRect();
+    const index = Number(element.dataset.column);
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    return { element, rect, index, distance: Math.hypot(x - centerX, y - centerY) };
+  }).filter((column) => {
+    if (!Number.isInteger(column.index) || column.index === pointerDrag.fromColumn) return false;
+    if (state.board[column.index].length >= columnCapacity) return false;
+    const verticalPad = Math.max(44, column.rect.height * 0.12);
+    return y >= column.rect.top - verticalPad && y <= column.rect.bottom + verticalPad;
+  });
+  if (columns.length === 0) return null;
+  columns.sort((a, b) => a.distance - b.distance);
+  const closest = columns[0];
+  const horizontalReach = Math.max(closest.rect.width * 0.78, 86);
+  return Math.abs(x - (closest.rect.left + closest.rect.width / 2)) <= horizontalReach ? closest.index : null;
 }
 
 function highlightPointerDropTarget() {
-  const targetColumn = columnFromPoint(pointerDrag.x, pointerDrag.y);
+  const targetColumn = nearestDropColumn(pointerDrag.x, pointerDrag.y);
+  pointerDrag.dropColumn = targetColumn;
   document.querySelectorAll(".play-column").forEach((column) => {
-    column.classList.toggle("drop-target", Number(column.dataset.column) === targetColumn);
+    const isTarget = Number(column.dataset.column) === targetColumn;
+    column.classList.toggle("drop-target", isTarget);
+    column.classList.toggle("invalid-drop", targetColumn === null && !column.classList.contains("dragging-column"));
   });
+  statusText.textContent = targetColumn === null ? "Drag over a column with open space." : `Release to drop in column ${targetColumn + 1}.`;
 }
 
 function clearHighlights() {
-  document.querySelectorAll(".drop-target,.hint-source,.hint-target").forEach((column) => {
-    column.classList.remove("drop-target", "hint-source", "hint-target");
+  document.querySelectorAll(".drop-target,.hint-source,.hint-target,.invalid-drop").forEach((column) => {
+    column.classList.remove("drop-target", "hint-source", "hint-target", "invalid-drop");
   });
 }
 
