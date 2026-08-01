@@ -35,12 +35,24 @@
 
       <section class="play-layout">
         <aside class="level-panel" aria-label="Level selection">
+          <div class="profile-card" aria-label="Player save profile">
+            <label class="select-label" for="profileSelect">Player</label>
+            <select id="profileSelect"></select>
+            <div class="profile-actions">
+              <button id="newProfileBtn" type="button">New</button>
+              <button id="exportProfileBtn" type="button">Export</button>
+              <button id="importProfileBtn" type="button">Import</button>
+            </div>
+            <input id="importProfileInput" type="file" accept="application/json" hidden>
+            <p id="profileText">Progress saves automatically.</p>
+          </div>
           <label class="select-label" for="packSelect">Level pack</label>
           <select id="packSelect">
             <option value="classic">Classic</option>
             <option value="starter">Starter</option>
             <option value="challenge">Challenge</option>
             <option value="expert">Expert</option>
+            <option value="hardcore">Hardcore</option>
             <option value="daily">Daily</option>
           </select>
           <div class="level-head">
@@ -114,6 +126,21 @@
               <option value="contrast">High Contrast</option>
             </select>
           </div>
+          <div class="wallet-panel" aria-label="Coins and unlocks">
+            <div>
+              <span class="status-label">Coins</span>
+              <strong id="coinCount">0</strong>
+            </div>
+            <span id="hardcoreStatus">Hardcore locked</span>
+          </div>
+          <details class="progress-drawer">
+            <summary>Achievements</summary>
+            <div class="achievement-grid" id="achievementGrid"></div>
+          </details>
+          <details class="progress-drawer">
+            <summary>Shop</summary>
+            <div class="shop-grid" id="shopGrid"></div>
+          </details>
           <div class="history-tray" aria-label="Move history">
             <span class="status-label">Move History</span>
             <ol id="moveHistoryList"></ol>

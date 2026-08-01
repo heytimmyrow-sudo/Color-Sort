@@ -12,16 +12,65 @@ const packKey = "tokenColumnsPackV2";
 const tutorialKey = "tokenColumnsTutorialSeenV1";
 const starsKey = "tokenColumnsStarsV1";
 const unlocksKey = "tokenColumnsUnlocksV1";
+const profileRegistryKey = "tokenColumnsProfilesV1";
+const activeProfileKey = "tokenColumnsActiveProfileV1";
+const legacyMigrationKey = "tokenColumnsProfilesMigratedV1";
 const liveUrl = window.location.origin;
 const tutorialLevelCount = 5;
+const defaultProfileId = "player-1";
+const campaignPackIds = ["classic", "starter", "challenge", "expert"];
 
 const packDefs = [
   { id: "classic", name: "Classic", total: 40, seed: 90210, extra: 0 },
   { id: "starter", name: "Starter", total: 30, seed: 74011, extra: -10 },
   { id: "challenge", name: "Challenge", total: 45, seed: 120303, extra: 12 },
   { id: "expert", name: "Expert", total: 50, seed: 421337, extra: 25 },
+  { id: "hardcore", name: "Hardcore", total: 50, seed: 8675309, extra: 42 },
   { id: "daily", name: "Daily", total: 1, seed: dailySeed(), extra: 16 }
 ];
+
+const achievementDefs = [
+  { id: "firstMove", name: "First Lift", text: "Make your first move.", coins: 10, test: () => state.stats.totalMoves >= 1 },
+  { id: "firstWin", name: "First Match", text: "Complete any level.", coins: 25, test: () => completedCount() >= 1 },
+  { id: "tutorialDone", name: "Training Board", text: "Complete all five Classic tutorial levels.", coins: 40, test: () => rangeComplete("classic", 0, tutorialLevelCount) },
+  { id: "fiveWins", name: "Getting Smooth", text: "Complete 5 levels.", coins: 50, test: () => completedCount() >= 5 },
+  { id: "twentyWins", name: "Column Climber", text: "Complete 20 levels.", coins: 85, test: () => completedCount() >= 20 },
+  { id: "firstGold", name: "Gold Breaker", text: "Beat one default record.", coins: 45, test: () => goldCount() >= 1 },
+  { id: "tenGold", name: "Sharp Hands", text: "Earn 10 gold records.", coins: 120, test: () => goldCount() >= 10 },
+  { id: "classicClear", name: "Classic Clear", text: "Complete the Classic pack.", coins: 150, test: () => packComplete("classic") },
+  { id: "starterClear", name: "Starter Sweep", text: "Complete the Starter pack.", coins: 120, test: () => packComplete("starter") },
+  { id: "challengeClear", name: "Challenge Clear", text: "Complete the Challenge pack.", coins: 200, test: () => packComplete("challenge") },
+  { id: "expertClear", name: "Expert Clear", text: "Complete the Expert pack.", coins: 300, test: () => packComplete("expert") },
+  { id: "hardcoreUnlock", name: "Hardcore Open", text: "Unlock Hardcore mode.", coins: 250, test: () => hardcoreUnlocked() },
+  { id: "hardcoreFirst", name: "No Training Wheels", text: "Complete one Hardcore level.", coins: 200, test: () => completedCount("hardcore") >= 1 },
+  { id: "dailyDone", name: "Daily Drop", text: "Complete today's Daily level.", coins: 40, test: () => state.records["daily:0"] !== undefined },
+  { id: "hundredMoves", name: "Hands Warm", text: "Make 100 total moves.", coins: 65, test: () => state.stats.totalMoves >= 100 },
+  { id: "shopper", name: "Fresh Look", text: "Buy one shop item.", coins: 35, test: () => state.stats.shopPurchases >= 1 }
+];
+
+const shopItems = [
+  { id: "token-rings", kind: "tokenStyle", value: "rings", name: "Ring Tokens", cost: 80 },
+  { id: "token-glossy", kind: "tokenStyle", value: "glossy", name: "Glossy Tokens", cost: 120 },
+  { id: "token-neon", kind: "tokenStyle", value: "neon", name: "Neon Tokens", cost: 180 },
+  { id: "bg-ocean", kind: "boardStyle", value: "ocean", name: "Ocean Board", cost: 110 },
+  { id: "bg-garden", kind: "boardStyle", value: "garden", name: "Garden Board", cost: 110 },
+  { id: "bg-space", kind: "boardStyle", value: "space", name: "Space Board", cost: 160 }
+];
+
+const defaultProfileState = {
+  packId: "classic",
+  records: {},
+  progress: {},
+  saves: {},
+  stars: {},
+  unlocks: { classic: 0, starter: 0, challenge: 0, expert: 0, hardcore: 0, daily: 0 },
+  prefs: { muted: false, symbols: false, theme: "toy" },
+  coins: 0,
+  achievements: {},
+  unlockedCosmetics: { "token-classic": true, "board-maple": true },
+  cosmetics: { tokenStyle: "classic", boardStyle: "maple" },
+  stats: { totalMoves: 0, totalWins: 0, shopPurchases: 0 }
+};
 const handAuthoredScrambles = [
   [{ from: 0, to: 1 }],
   [{ from: 0, to: 1 }, { from: 2, to: 3 }],
@@ -35,9 +84,11 @@ const handAuthoredScrambles = [
   [{ from: 1, to: 2 }, { from: 3, to: 0 }, { from: 2, to: 3 }, { from: 0, to: 1 }, { from: 3, to: 2 }, { from: 1, to: 0 }, { from: 2, to: 1 }, { from: 0, to: 3 }, { from: 1, to: 2 }, { from: 3, to: 0 }]
 ];
 
+ensureLegacyProfile();
 const levelCache = new Map();
 const state = {
-  packId: localStorage.getItem(packKey) || "classic",
+  profileId: loadActiveProfileId(),
+  profileName: profileName(loadActiveProfileId()),
   levelIndex: 0,
   board: [],
   target: [],
@@ -48,12 +99,7 @@ const state = {
   moves: 0,
   completed: false,
   dragFromColumn: null,
-  records: loadStoredMap(recordsKey),
-  progress: loadStoredMap(progressKey),
-  saves: loadStoredMap(savesKey),
-  stars: loadStoredMap(starsKey),
-  unlocks: { classic: 0, starter: 0, challenge: 0, expert: 0, daily: 0, ...loadStoredMap(unlocksKey) },
-  prefs: { muted: false, symbols: false, theme: "toy", ...loadStoredMap(prefsKey) }
+  ...loadProfileState(loadActiveProfileId())
 };
 
 let pointerDrag = null;
@@ -76,6 +122,12 @@ const matchedCount = document.querySelector("#matchedCount");
 const matchMeterFill = document.querySelector("#matchMeterFill");
 const statusText = document.querySelector("#statusText");
 const packSelect = document.querySelector("#packSelect");
+const profileSelect = document.querySelector("#profileSelect");
+const newProfileBtn = document.querySelector("#newProfileBtn");
+const exportProfileBtn = document.querySelector("#exportProfileBtn");
+const importProfileBtn = document.querySelector("#importProfileBtn");
+const importProfileInput = document.querySelector("#importProfileInput");
+const profileText = document.querySelector("#profileText");
 const restartBtn = document.querySelector("#restartBtn");
 const undoBtn = document.querySelector("#undoBtn");
 const tutorialBtn = document.querySelector("#tutorialBtn");
@@ -87,6 +139,10 @@ const clearRecordsBtn = document.querySelector("#clearRecordsBtn");
 const muteBtn = document.querySelector("#muteBtn");
 const symbolsBtn = document.querySelector("#symbolsBtn");
 const themeSelect = document.querySelector("#themeSelect");
+const coinCount = document.querySelector("#coinCount");
+const hardcoreStatus = document.querySelector("#hardcoreStatus");
+const achievementGrid = document.querySelector("#achievementGrid");
+const shopGrid = document.querySelector("#shopGrid");
 const moveHistoryList = document.querySelector("#moveHistoryList");
 const installBtn = document.querySelector("#installBtn");
 const installText = document.querySelector("#installText");
@@ -138,6 +194,10 @@ function activePack() {
   return packDefs.find((pack) => pack.id === state.packId) || packDefs[0];
 }
 
+function packById(packId) {
+  return packDefs.find((pack) => pack.id === packId) || packDefs[0];
+}
+
 function levelsForPack(pack = activePack()) {
   if (!levelCache.has(pack.id)) {
     levelCache.set(pack.id, Array.from({ length: pack.total }, (_, index) => createLevel(index, pack)));
@@ -157,8 +217,33 @@ function isUnlocked(index, packId = state.packId) {
   return index <= unlockedIndex(packId);
 }
 
+function packComplete(packId) {
+  const pack = packById(packId);
+  return Array.from({ length: pack.total }, (_, index) => `${packId}:${index}`).every((key) => state.records[key] !== undefined);
+}
+
+function rangeComplete(packId, start, end) {
+  return Array.from({ length: end - start }, (_, offset) => `${packId}:${start + offset}`).every((key) => state.records[key] !== undefined);
+}
+
+function completedCount(packId = null) {
+  return Object.keys(state.records).filter((key) => !packId || key.startsWith(`${packId}:`)).length;
+}
+
+function goldCount() {
+  return Object.entries(state.stars).filter(([, stars]) => Number(stars) >= 3).length;
+}
+
+function hardcoreUnlocked() {
+  return campaignPackIds.every(packComplete);
+}
+
+function packAvailable(packId) {
+  return packId !== "hardcore" || hardcoreUnlocked();
+}
+
 function saveUnlocks() {
-  saveJson(unlocksKey, state.unlocks);
+  saveProfileState();
 }
 
 function hydrateUnlocksFromRecords() {
@@ -175,8 +260,28 @@ function hydrateUnlocksFromRecords() {
     }
     state.unlocks[pack.id] = Math.min(unlocked, pack.total - 1);
   }
-  saveJson(starsKey, state.stars);
+  if (!hardcoreUnlocked()) state.unlocks.hardcore = 0;
+  saveProfileState();
   saveUnlocks();
+}
+
+function evaluateAchievements() {
+  const newlyEarned = [];
+  for (const achievement of achievementDefs) {
+    if (state.achievements[achievement.id]?.earned) continue;
+    if (!achievement.test()) continue;
+    state.achievements[achievement.id] = { earned: true, earnedAt: Date.now() };
+    state.coins += achievement.coins;
+    newlyEarned.push(achievement);
+  }
+  if (newlyEarned.length > 0) {
+    saveProfileState();
+    renderAchievements();
+    renderShop();
+    const names = newlyEarned.map((achievement) => achievement.name).join(", ");
+    statusText.textContent = `Achievement unlocked: ${names}. Coins added.`;
+  }
+  return newlyEarned;
 }
 
 function starsForMoves(moves, level) {
@@ -343,8 +448,178 @@ function saveJson(key, value) {
   localStorage.setItem(key, JSON.stringify(value));
 }
 
+function mergeDefaults(value, defaults) {
+  const result = Array.isArray(defaults) ? [] : {};
+  Object.keys(defaults).forEach((key) => {
+    if (defaults[key] && typeof defaults[key] === "object" && !Array.isArray(defaults[key])) {
+      result[key] = mergeDefaults(value?.[key], defaults[key]);
+    } else {
+      result[key] = value?.[key] ?? defaults[key];
+    }
+  });
+  Object.keys(value || {}).forEach((key) => {
+    if (result[key] === undefined) result[key] = value[key];
+  });
+  return result;
+}
+
+function profileStorageKey(profileId) {
+  return `tokenColumnsProfile:${profileId}`;
+}
+
+function readProfiles() {
+  const profiles = loadStoredMap(profileRegistryKey);
+  if (!profiles[defaultProfileId]) profiles[defaultProfileId] = { id: defaultProfileId, name: "Player 1", createdAt: Date.now() };
+  saveJson(profileRegistryKey, profiles);
+  return profiles;
+}
+
+function profileName(profileId) {
+  return readProfiles()[profileId]?.name || "Player";
+}
+
+function loadActiveProfileId() {
+  const profiles = readProfiles();
+  const stored = localStorage.getItem(activeProfileKey);
+  return profiles[stored] ? stored : defaultProfileId;
+}
+
+function ensureLegacyProfile() {
+  const profiles = readProfiles();
+  if (localStorage.getItem(legacyMigrationKey) === "true") return;
+  const legacy = {
+    ...defaultProfileState,
+    packId: localStorage.getItem(packKey) || "classic",
+    records: loadStoredMap(recordsKey),
+    progress: loadStoredMap(progressKey),
+    saves: loadStoredMap(savesKey),
+    stars: loadStoredMap(starsKey),
+    unlocks: { ...defaultProfileState.unlocks, ...loadStoredMap(unlocksKey) },
+    prefs: { ...defaultProfileState.prefs, ...loadStoredMap(prefsKey) }
+  };
+  saveJson(profileStorageKey(defaultProfileId), legacy);
+  profiles[defaultProfileId] = profiles[defaultProfileId] || { id: defaultProfileId, name: "Player 1", createdAt: Date.now() };
+  saveJson(profileRegistryKey, profiles);
+  localStorage.setItem(activeProfileKey, defaultProfileId);
+  localStorage.setItem(legacyMigrationKey, "true");
+}
+
+function loadProfileState(profileId) {
+  return mergeDefaults(loadStoredMap(profileStorageKey(profileId)), defaultProfileState);
+}
+
+function serializableProfileState() {
+  return {
+    packId: state.packId,
+    records: state.records,
+    progress: state.progress,
+    saves: state.saves,
+    stars: state.stars,
+    unlocks: state.unlocks,
+    prefs: state.prefs,
+    coins: state.coins,
+    achievements: state.achievements,
+    unlockedCosmetics: state.unlockedCosmetics,
+    cosmetics: state.cosmetics,
+    stats: state.stats
+  };
+}
+
+function saveProfileState() {
+  saveJson(profileStorageKey(state.profileId), serializableProfileState());
+}
+
+function renderProfiles() {
+  const profiles = readProfiles();
+  profileSelect.innerHTML = "";
+  Object.values(profiles).forEach((profile) => {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = profile.name;
+    profileSelect.append(option);
+  });
+  profileSelect.value = state.profileId;
+  profileText.textContent = `${state.profileName}: auto-saving to this profile. Export makes a backup file.`;
+}
+
+function switchProfile(profileId) {
+  const profiles = readProfiles();
+  if (!profiles[profileId]) return;
+  stopGameplaySession();
+  Object.assign(state, loadProfileState(profileId), {
+    profileId,
+    profileName: profiles[profileId].name,
+    levelIndex: 0,
+    board: [],
+    target: [],
+    history: [],
+    moveLog: [],
+    selectedColumn: null,
+    lastMove: null,
+    moves: 0,
+    completed: false,
+    dragFromColumn: null
+  });
+  localStorage.setItem(activeProfileKey, profileId);
+  hydrateUnlocksFromRecords();
+  applyPrefs();
+  renderProfiles();
+  renderAchievements();
+  renderShop();
+  setPack(state.packId, true);
+  evaluateAchievements();
+}
+
+function createProfile() {
+  const profiles = readProfiles();
+  const number = Object.keys(profiles).length + 1;
+  const id = `player-${Date.now().toString(36)}`;
+  profiles[id] = { id, name: `Player ${number}`, createdAt: Date.now() };
+  saveJson(profileRegistryKey, profiles);
+  saveJson(profileStorageKey(id), defaultProfileState);
+  switchProfile(id);
+}
+
+function exportProfile() {
+  const payload = {
+    app: "Token Columns",
+    version: 1,
+    profile: { id: state.profileId, name: state.profileName },
+    savedAt: new Date().toISOString(),
+    data: serializableProfileState()
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = `${state.profileName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "token-columns"}-save.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(link.href);
+  profileText.textContent = "Save file exported.";
+}
+
+async function importProfileFile(file) {
+  try {
+    const payload = JSON.parse(await file.text());
+    const imported = mergeDefaults(payload.data || payload, defaultProfileState);
+    const profiles = readProfiles();
+    const id = `player-${Date.now().toString(36)}`;
+    const nameBase = payload.profile?.name || file.name.replace(/\.json$/i, "") || "Imported Player";
+    profiles[id] = { id, name: `${nameBase} Import`, createdAt: Date.now() };
+    saveJson(profileRegistryKey, profiles);
+    saveJson(profileStorageKey(id), imported);
+    switchProfile(id);
+    profileText.textContent = "Save file imported as a new player.";
+  } catch {
+    profileText.textContent = "That save file could not be imported.";
+  } finally {
+    importProfileInput.value = "";
+  }
+}
+
 function savePrefs() {
-  saveJson(prefsKey, state.prefs);
+  saveProfileState();
 }
 
 function markInProgress() {
@@ -352,7 +627,7 @@ function markInProgress() {
   const key = levelKey();
   if (state.records[key] === undefined && !state.progress[key]) {
     state.progress[key] = true;
-    saveJson(progressKey, state.progress);
+    saveProfileState();
     renderLevelButtons();
   }
 }
@@ -365,15 +640,18 @@ function saveCurrentBoard() {
     history: state.history,
     moveLog: state.moveLog
   };
-  saveJson(savesKey, state.saves);
+  saveProfileState();
 }
 
 function clearCurrentSave(index = state.levelIndex) {
   delete state.saves[`${state.packId}:${index}`];
-  saveJson(savesKey, state.saves);
+  saveProfileState();
 }
 
 function renderLevelButtons() {
+  renderPackOptions();
+  coinCount.textContent = String(state.coins);
+  hardcoreStatus.textContent = hardcoreUnlocked() ? "Hardcore unlocked" : "Hardcore unlocks when Classic, Starter, Challenge, and Expert are complete.";
   const levels = levelsForPack();
   levelGrid.innerHTML = "";
   levels.forEach((level, index) => {
@@ -412,6 +690,63 @@ function renderLevelButtons() {
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
   });
+}
+
+function renderPackOptions() {
+  Array.from(packSelect.options).forEach((option) => {
+    option.disabled = !packAvailable(option.value);
+    if (option.value === "hardcore") option.textContent = hardcoreUnlocked() ? "Hardcore" : "Hardcore (locked)";
+  });
+}
+
+function renderAchievements() {
+  achievementGrid.innerHTML = "";
+  achievementDefs.forEach((achievement) => {
+    const earned = Boolean(state.achievements[achievement.id]?.earned);
+    const card = document.createElement("article");
+    card.className = `achievement-card${earned ? " earned" : ""}`;
+    const title = document.createElement("strong");
+    title.textContent = achievement.name;
+    const text = document.createElement("span");
+    text.textContent = achievement.text;
+    const reward = document.createElement("em");
+    reward.textContent = earned ? "Claimed" : `${achievement.coins} coins`;
+    card.append(title, text, reward);
+    achievementGrid.append(card);
+  });
+  coinCount.textContent = String(state.coins);
+}
+
+function renderShop() {
+  shopGrid.innerHTML = "";
+  coinCount.textContent = String(state.coins);
+  shopItems.forEach((item) => {
+    const owned = Boolean(state.unlockedCosmetics[item.id]);
+    const equipped = state.cosmetics[item.kind] === item.value;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `shop-item${equipped ? " equipped" : ""}`;
+    button.innerHTML = `<span>${item.name}</span><strong>${equipped ? "Equipped" : owned ? "Use" : `${item.cost} coins`}</strong>`;
+    button.disabled = !owned && state.coins < item.cost;
+    button.addEventListener("click", () => buyOrEquip(item));
+    shopGrid.append(button);
+  });
+}
+
+function buyOrEquip(item) {
+  const owned = Boolean(state.unlockedCosmetics[item.id]);
+  if (!owned) {
+    if (state.coins < item.cost) return;
+    state.coins -= item.cost;
+    state.unlockedCosmetics[item.id] = true;
+    state.stats.shopPurchases += 1;
+  }
+  state.cosmetics[item.kind] = item.value;
+  saveProfileState();
+  applyPrefs();
+  renderShop();
+  evaluateAchievements();
+  statusText.textContent = `${item.name} equipped.`;
 }
 
 function tokenText(color) {
@@ -681,10 +1016,12 @@ function moveTopToken(fromColumn, toColumn) {
   state.moveLog.push({ from: fromColumn, to: toColumn, color: movedColor });
   state.selectedColumn = null;
   state.moves += 1;
+  state.stats.totalMoves += 1;
   state.lastMove = { from: fromColumn, to: toColumn };
   statusText.textContent = "Good. Keep moving only the top tokens until the four shown positions match.";
   playTone(392, 0.06);
   saveCurrentBoard();
+  evaluateAchievements();
   renderBoard();
   window.setTimeout(() => {
     if (state.lastMove?.from === fromColumn && state.lastMove?.to === toColumn) {
@@ -733,21 +1070,22 @@ function checkSolved() {
   const isRecord = previous === undefined || state.moves < previous;
   const level = levelsForPack()[state.levelIndex];
   const earnedStars = starsForMoves(state.moves, level);
+  state.stats.totalWins += 1;
   if (isRecord) {
     state.records[key] = state.moves;
-    saveJson(recordsKey, state.records);
   }
   state.stars[key] = Math.max(Number(state.stars[key] || 0), earnedStars);
-  saveJson(starsKey, state.stars);
   if (state.levelIndex < levelsForPack().length - 1 && unlockedIndex() <= state.levelIndex) {
     state.unlocks[state.packId] = state.levelIndex + 1;
     saveUnlocks();
   }
   delete state.progress[key];
   delete state.saves[key];
-  saveJson(progressKey, state.progress);
-  saveJson(savesKey, state.saves);
+  const earnedAchievements = evaluateAchievements();
+  saveProfileState();
   renderLevelButtons();
+  renderAchievements();
+  renderShop();
   updateStats();
   playTone(659, 0.08);
   window.setTimeout(() => playTone(880, 0.12), 90);
@@ -758,7 +1096,9 @@ function checkSolved() {
   const paceWord = state.moves < defaultRecord ? " Great route." : "";
   const unlockWord = state.levelIndex < levelsForPack().length - 1 ? ` Level ${state.levelIndex + 2} unlocked.` : " Pack complete.";
   const tutorialWord = isTutorialLevel() ? ` Tutorial ${state.levelIndex + 1} complete.` : "";
-  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${tutorialWord}${unlockWord}`;
+  const achievementWord = earnedAchievements.length ? ` Achievements: ${earnedAchievements.map((achievement) => achievement.name).join(", ")}.` : "";
+  const hardcoreWord = hardcoreUnlocked() ? " Hardcore mode is open." : "";
+  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${tutorialWord}${unlockWord}${hardcoreWord}${achievementWord}`;
   winDialog.classList.remove("hidden");
 }
 
@@ -850,15 +1190,19 @@ function clearRecords() {
   state.progress = {};
   state.saves = {};
   state.stars = {};
-  state.unlocks = { classic: 0, starter: 0, challenge: 0, expert: 0, daily: 0 };
-  saveJson(recordsKey, state.records);
-  saveJson(progressKey, state.progress);
-  saveJson(savesKey, state.saves);
-  saveJson(starsKey, state.stars);
-  saveUnlocks();
+  state.unlocks = { ...defaultProfileState.unlocks };
+  state.coins = 0;
+  state.achievements = {};
+  state.unlockedCosmetics = { ...defaultProfileState.unlockedCosmetics };
+  state.cosmetics = { ...defaultProfileState.cosmetics };
+  state.stats = { ...defaultProfileState.stats };
+  saveProfileState();
   renderLevelButtons();
-  updateStats();
-  statusText.textContent = "Personal records and saved boards cleared on this device.";
+  renderAchievements();
+  renderShop();
+  applyPrefs();
+  loadLevel(0);
+  statusText.textContent = `${state.profileName}'s records, coins, achievements, and saved boards were cleared.`;
 }
 
 function showHint() {
@@ -977,6 +1321,8 @@ function playTone(frequency, duration) {
 
 function applyPrefs() {
   document.body.dataset.theme = state.prefs.theme;
+  document.body.dataset.tokenStyle = state.cosmetics.tokenStyle;
+  document.body.dataset.boardStyle = state.cosmetics.boardStyle;
   document.body.classList.toggle("symbols-on", state.prefs.symbols);
   muteBtn.textContent = state.prefs.muted ? "Sound Off" : "Sound On";
   symbolsBtn.textContent = state.prefs.symbols ? "Symbols On" : "Symbols Off";
@@ -994,11 +1340,18 @@ async function installApp() {
   installText.textContent = "On iPhone or iPad, tap Share, then Add to Home Screen. On Android, use the browser menu or install prompt.";
 }
 
-function setPack(packId) {
+function setPack(packId, fromProfileSwitch = false) {
+  if (!packAvailable(packId)) {
+    state.packId = "classic";
+    packSelect.value = state.packId;
+    statusText.textContent = "Hardcore unlocks after every Classic, Starter, Challenge, and Expert level is completed.";
+    return;
+  }
   state.packId = packDefs.some((pack) => pack.id === packId) ? packId : "classic";
-  localStorage.setItem(packKey, state.packId);
+  saveProfileState();
   packSelect.value = state.packId;
   loadLevel(Math.min(unlockedIndex(), levelsForPack().length - 1));
+  if (!fromProfileSwitch && state.packId === "hardcore") statusText.textContent = "Hardcore mode: tougher scrambles, same top-token rules.";
 }
 
 document.addEventListener("visibilitychange", () => {
@@ -1011,6 +1364,14 @@ window.addEventListener("beforeinstallprompt", (event) => {
   installText.textContent = "This device can add Token Columns as a home-screen app shortcut.";
 });
 
+profileSelect.addEventListener("change", () => switchProfile(profileSelect.value));
+newProfileBtn.addEventListener("click", createProfile);
+exportProfileBtn.addEventListener("click", exportProfile);
+importProfileBtn.addEventListener("click", () => importProfileInput.click());
+importProfileInput.addEventListener("change", () => {
+  const file = importProfileInput.files?.[0];
+  if (file) importProfileFile(file);
+});
 packSelect.addEventListener("change", () => setPack(packSelect.value));
 restartBtn.addEventListener("click", restartLevel);
 mobileRestartBtn.addEventListener("click", restartLevel);
@@ -1058,10 +1419,15 @@ tutorialDialog.addEventListener("click", (event) => {
 });
 
 if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
+if (!packAvailable(state.packId)) state.packId = "classic";
 packSelect.value = state.packId;
 applyPrefs();
 pokiCall("gameLoadingStart");
 hydrateUnlocksFromRecords();
+renderProfiles();
+renderAchievements();
+renderShop();
 loadLevel(0);
+evaluateAchievements();
 pokiCall("gameLoadingFinished");
 if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);

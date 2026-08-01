@@ -4,35 +4,35 @@
     "totalBytes": 8388608
   },
   "totals": {
-    "bytes": 136491,
-    "gzipBytes": 33903
+    "bytes": 175854,
+    "gzipBytes": 42666
   },
   "withinBudget": true,
   "files": [
     {
       "path": "index.html",
-      "bytes": 8455,
-      "gzipBytes": 2263
+      "bytes": 9774,
+      "gzipBytes": 2522
     },
     {
       "path": "styles.css",
-      "bytes": 21884,
-      "gzipBytes": 5139
+      "bytes": 25940,
+      "gzipBytes": 5885
     },
     {
       "path": "styles-v2.css",
-      "bytes": 21884,
-      "gzipBytes": 5139
+      "bytes": 25940,
+      "gzipBytes": 5885
     },
     {
       "path": "game.js",
-      "bytes": 40219,
-      "gzipBytes": 9564
+      "bytes": 55185,
+      "gzipBytes": 13070
     },
     {
       "path": "game-v2.js",
-      "bytes": 40219,
-      "gzipBytes": 9564
+      "bytes": 55185,
+      "gzipBytes": 13070
     },
     {
       "path": "app-icon.svg",
