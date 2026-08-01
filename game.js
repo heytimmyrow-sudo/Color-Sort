@@ -107,6 +107,7 @@ const state = {
   moveLog: [],
   selectedColumn: null,
   lastMove: null,
+  hintPath: [],
   moves: 0,
   completed: false,
   dragFromColumn: null,
@@ -1259,8 +1260,13 @@ function moveTopToken(fromColumn, toColumn) {
   }
   const movedColor = state.board[fromColumn][state.board[fromColumn].length - 1];
   markInProgress();
-  state.history.push({ board: cloneColumns(state.board), moves: state.moves, moveLog: [...state.moveLog] });
+  state.history.push({ board: cloneColumns(state.board), moves: state.moves, moveLog: [...state.moveLog], hintPath: state.hintPath ? [...state.hintPath] : [] });
   applyMove(state.board, fromColumn, toColumn);
+  if (state.hintPath?.length && state.hintPath[0].from === fromColumn && state.hintPath[0].to === toColumn) {
+    state.hintPath.shift();
+  } else {
+    state.hintPath = [];
+  }
   state.moveLog.push({ from: fromColumn, to: toColumn, color: movedColor });
   state.selectedColumn = null;
   state.moves += 1;
@@ -1339,6 +1345,7 @@ function updateMinimumDisplay() {
           state.target = cloneColumns(replacement.target);
           state.history = [];
           state.moveLog = [];
+          state.hintPath = [...replacement.solution];
           state.selectedColumn = null;
           state.lastMove = null;
           renderTargets();
@@ -1430,6 +1437,7 @@ function loadLevel(index) {
   state.target = cloneColumns(level.target);
   state.history = canRestoreSave ? saved?.history || [] : [];
   state.moveLog = canRestoreSave ? saved?.moveLog || [] : [];
+  state.hintPath = canRestoreSave ? [] : [...level.solution];
   state.selectedColumn = null;
   state.lastMove = null;
   state.moves = canRestoreSave ? saved?.moves || 0 : 0;
@@ -1460,6 +1468,7 @@ function undoMove() {
   state.board = cloneColumns(previous.board);
   state.moves = previous.moves;
   state.moveLog = previous.moveLog || [];
+  state.hintPath = previous.hintPath || [];
   state.selectedColumn = null;
   state.lastMove = null;
   state.dragFromColumn = null;
@@ -1481,6 +1490,7 @@ function newScramble() {
   state.target = cloneColumns(replacement.target);
   state.history = [];
   state.moveLog = [];
+  state.hintPath = [...replacement.solution];
   state.selectedColumn = null;
   state.lastMove = null;
   state.moves = 0;
@@ -1584,7 +1594,7 @@ function clearRecords() {
 function showHint() {
   if (state.completed) return;
   clearHighlights();
-  const answer = findShortestSolution(state.board, state.target, 140000, currentCapacities());
+  const answer = state.hintPath?.length ? state.hintPath : findShortestSolution(state.board, state.target, 220000, currentCapacities());
   const move = answer?.[0] || bestLocalMove();
   if (!move) {
     statusText.textContent = "No hint found from this board. Restarting will always give a solvable setup.";
