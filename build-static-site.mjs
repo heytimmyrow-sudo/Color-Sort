@@ -75,5 +75,7 @@ export default {
 `;
 
 await mkdir("dist/server", { recursive: true });
+await mkdir("dist/.openai", { recursive: true });
 await writeFile("dist/server/index.js", worker);
 await Promise.all([...textFileNames, ...binaryFileNames].map((name) => copyFile(name, `dist/${name}`)));
+await copyFile(".openai/hosting.json", "dist/.openai/hosting.json");

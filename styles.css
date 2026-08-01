@@ -524,6 +524,7 @@ h1 {
   padding: 0;
   box-shadow: inset 0 -7px rgba(0, 0, 0, .17), 0 9px 13px rgba(46, 28, 11, .25);
   touch-action: none;
+  transition: transform .18s ease, box-shadow .18s ease, filter .18s ease;
 }
 
 .token.selected {
@@ -540,6 +541,18 @@ h1 {
 
 .dragging-column {
   opacity: .72;
+}
+
+.last-source::before {
+  filter: brightness(.92);
+}
+
+.last-target::before {
+  box-shadow: inset 0 3px 7px rgba(31, 19, 9, .28), 0 0 0 8px rgba(66, 173, 68, .14);
+}
+
+.token.landed {
+  animation: token-land .38s cubic-bezier(.2, .9, .25, 1.25) both;
 }
 
 .pointer-dragging .play-column {
@@ -708,6 +721,23 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
+.match-meter {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(32, 26, 22, .14);
+  box-shadow: inset 0 2px 4px rgba(46, 28, 11, .18);
+}
+
+.match-meter span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--red), var(--yellow), var(--green), var(--blue));
+  transition: width .24s ease;
+}
+
 .actions {
   display: grid;
   gap: 9px;
@@ -736,6 +766,8 @@ h1 {
 .win-dialog.hidden { display: none; }
 
 .win-card {
+  position: relative;
+  overflow: hidden;
   width: min(390px, 100%);
   padding: 22px;
   border-radius: 8px;
@@ -753,6 +785,25 @@ h1 {
   line-height: 1.4;
 }
 
+.win-burst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.win-burst span {
+  position: absolute;
+  width: 18px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  animation: burst-pop .8s ease-out both;
+}
+
+.win-burst span:nth-child(1) { left: 18%; top: 24%; background: var(--red); }
+.win-burst span:nth-child(2) { right: 18%; top: 20%; background: var(--yellow); animation-delay: .05s; }
+.win-burst span:nth-child(3) { left: 28%; bottom: 18%; background: var(--green); animation-delay: .1s; }
+.win-burst span:nth-child(4) { right: 24%; bottom: 20%; background: var(--blue); animation-delay: .15s; }
+
 .wood-board.celebrate .token {
   animation: token-pop .52s ease-in-out both;
 }
@@ -761,6 +812,101 @@ h1 {
   0% { transform: translateY(0) scale(1); }
   45% { transform: translateY(-10px) scale(1.08); }
   100% { transform: translateY(0) scale(1); }
+}
+
+@keyframes token-land {
+  0% { transform: translateY(-24px) scale(.92); filter: brightness(1.08); }
+  60% { transform: translateY(4px) scale(1.07); }
+  100% { transform: translateY(0) scale(1); filter: brightness(1); }
+}
+
+@keyframes burst-pop {
+  0% { transform: translateY(18px) scale(.2); opacity: 0; }
+  35% { opacity: .95; }
+  100% { transform: translateY(-42px) scale(1.2); opacity: 0; }
+}
+
+.tutorial-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(32, 26, 22, .5);
+}
+
+.tutorial-dialog.hidden { display: none; }
+
+.tutorial-card {
+  width: min(440px, 100%);
+  padding: 22px;
+  border-radius: 8px;
+  background: var(--panel);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, .3);
+}
+
+.tutorial-card h2 {
+  font-size: clamp(32px, 8vw, 46px);
+}
+
+.tutorial-card ol {
+  margin: 16px 0;
+  padding-left: 24px;
+  color: var(--muted);
+  font-weight: 850;
+  line-height: 1.42;
+}
+
+.tutorial-card li {
+  margin-bottom: 7px;
+}
+
+.tutorial-demo {
+  display: grid;
+  grid-template-columns: 92px 1fr;
+  gap: 14px;
+  align-items: center;
+  margin: 16px 0 4px;
+}
+
+.mini-card,
+.mini-board {
+  border-radius: 8px;
+  background: #fffaf0;
+  box-shadow: inset 0 0 0 1px rgba(75, 54, 33, .16), 0 8px 16px rgba(56, 39, 20, .12);
+}
+
+.mini-card {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  padding: 12px;
+}
+
+.mini-board {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 94px;
+}
+
+.mini-dot,
+.mini-token {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  box-shadow: inset 0 -4px rgba(0, 0, 0, .14), 0 6px 10px rgba(46, 28, 11, .18);
+}
+
+.mini-dot { width: 28px; }
+.mini-token { width: 48px; }
+
+.mini-arrow {
+  color: var(--muted);
+  font-size: 30px;
+  font-weight: 950;
 }
 
 .mobile-controls {
@@ -938,6 +1084,15 @@ h1 {
   .actions .primary,
   .actions button:last-child {
     grid-column: 1 / -1;
+  }
+
+  .tutorial-demo {
+    grid-template-columns: 1fr;
+  }
+
+  .mini-card {
+    grid-template-columns: repeat(4, 1fr);
+    justify-items: center;
   }
 
   .qr-section {

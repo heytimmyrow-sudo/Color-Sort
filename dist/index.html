@@ -91,8 +91,12 @@
               <strong id="matchedCount">0 / 16</strong>
             </div>
           </div>
+          <div class="match-meter" aria-label="Matched token progress">
+            <span id="matchMeterFill"></span>
+          </div>
           <div class="actions">
             <button class="primary" id="nextLevelBtn" type="button">Next Level</button>
+            <button id="tutorialBtn" type="button">How to Play</button>
             <button id="hintBtn" type="button">Hint</button>
             <button id="restartBtn" type="button">Restart</button>
             <button id="undoBtn" type="button">Undo Move</button>
@@ -137,10 +141,43 @@
     <div class="win-card">
       <p class="eyebrow">Complete</p>
       <h2 id="winTitle">Level solved</h2>
+      <div class="win-burst" aria-hidden="true">
+        <span></span><span></span><span></span><span></span>
+      </div>
       <p id="winSummary"></p>
       <div class="actions horizontal">
         <button class="primary" id="winNextBtn" type="button">Next Level</button>
         <button id="winReplayBtn" type="button">Replay</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tutorial-dialog hidden" id="tutorialDialog" role="dialog" aria-modal="true" aria-labelledby="tutorialTitle">
+    <div class="tutorial-card">
+      <p class="eyebrow">How to play</p>
+      <h2 id="tutorialTitle">Move the top token only.</h2>
+      <div class="tutorial-demo" aria-hidden="true">
+        <div class="mini-card">
+          <span class="mini-dot red"></span>
+          <span class="mini-dot yellow"></span>
+          <span class="mini-dot green"></span>
+          <span class="mini-dot blue"></span>
+        </div>
+        <div class="mini-board">
+          <span class="mini-token blue"></span>
+          <span class="mini-token green"></span>
+          <span class="mini-arrow">→</span>
+          <span class="mini-token red"></span>
+        </div>
+      </div>
+      <ol>
+        <li>Pick up the top circle from one column.</li>
+        <li>Drop it onto another column with open space.</li>
+        <li>Match the four shown spots on the card.</li>
+      </ol>
+      <div class="actions horizontal">
+        <button class="primary" id="tutorialStartBtn" type="button">Play</button>
+        <button id="tutorialHintBtn" type="button">Show Hint</button>
       </div>
     </div>
   </div>

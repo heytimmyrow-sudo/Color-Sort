@@ -9,6 +9,7 @@ const progressKey = "tokenColumnsProgressV3";
 const savesKey = "tokenColumnsSavesV3";
 const prefsKey = "tokenColumnsPrefsV2";
 const packKey = "tokenColumnsPackV2";
+const tutorialKey = "tokenColumnsTutorialSeenV1";
 const liveUrl = window.location.origin;
 
 const packDefs = [
@@ -28,6 +29,7 @@ const state = {
   history: [],
   moveLog: [],
   selectedColumn: null,
+  lastMove: null,
   moves: 0,
   completed: false,
   dragFromColumn: null,
@@ -53,10 +55,12 @@ const recordTarget = document.querySelector("#recordTarget");
 const bestMoves = document.querySelector("#bestMoves");
 const moveCount = document.querySelector("#moveCount");
 const matchedCount = document.querySelector("#matchedCount");
+const matchMeterFill = document.querySelector("#matchMeterFill");
 const statusText = document.querySelector("#statusText");
 const packSelect = document.querySelector("#packSelect");
 const restartBtn = document.querySelector("#restartBtn");
 const undoBtn = document.querySelector("#undoBtn");
+const tutorialBtn = document.querySelector("#tutorialBtn");
 const hintBtn = document.querySelector("#hintBtn");
 const newScrambleBtn = document.querySelector("#newScrambleBtn");
 const nextLevelBtn = document.querySelector("#nextLevelBtn");
@@ -77,6 +81,9 @@ const winDialog = document.querySelector("#winDialog");
 const winSummary = document.querySelector("#winSummary");
 const winNextBtn = document.querySelector("#winNextBtn");
 const winReplayBtn = document.querySelector("#winReplayBtn");
+const tutorialDialog = document.querySelector("#tutorialDialog");
+const tutorialStartBtn = document.querySelector("#tutorialStartBtn");
+const tutorialHintBtn = document.querySelector("#tutorialHintBtn");
 
 function dailySeed() {
   const now = new Date();
@@ -311,6 +318,8 @@ function renderBoard() {
     columnEl.dataset.column = columnIndex;
     columnEl.setAttribute("aria-label", columnLabel(columnIndex));
     if (state.selectedColumn === columnIndex) columnEl.classList.add("selected-column");
+    if (state.lastMove?.from === columnIndex) columnEl.classList.add("last-source");
+    if (state.lastMove?.to === columnIndex) columnEl.classList.add("last-target");
     if (column.length < columnCapacity) columnEl.classList.add("can-receive");
     columnEl.addEventListener("click", () => selectOrMove(columnIndex));
     columnEl.addEventListener("dragover", (event) => {
@@ -332,6 +341,7 @@ function renderBoard() {
         token.className = `token ${color}`;
         token.title = `${colorNames[color]} token`;
         token.textContent = tokenText(color);
+        if (state.lastMove?.to === columnIndex && stackIndex === column.length - 1) token.classList.add("landed");
         slot.append(token);
       }
       columnEl.append(slot);
@@ -544,10 +554,17 @@ function moveTopToken(fromColumn, toColumn) {
   state.moveLog.push({ from: fromColumn, to: toColumn, color: movedColor });
   state.selectedColumn = null;
   state.moves += 1;
+  state.lastMove = { from: fromColumn, to: toColumn };
   statusText.textContent = "Good. Keep moving only the top tokens until the four shown positions match.";
   playTone(392, 0.06);
   saveCurrentBoard();
   renderBoard();
+  window.setTimeout(() => {
+    if (state.lastMove?.from === fromColumn && state.lastMove?.to === toColumn) {
+      state.lastMove = null;
+      renderBoard();
+    }
+  }, 420);
   checkSolved();
 }
 
@@ -559,6 +576,7 @@ function updateStats() {
   const matches = countMatches(state.board, state.target);
   moveCount.textContent = String(state.moves);
   matchedCount.textContent = `${matches} / ${columnCount * targetHeight}`;
+  matchMeterFill.style.width = `${Math.round(matches / (columnCount * targetHeight) * 100)}%`;
   levelName.textContent = `${activePack().name} ${state.levelIndex + 1}`;
   levelCount.textContent = `${state.levelIndex + 1} / ${levels.length}`;
   difficultyText.textContent = level.difficulty;
@@ -598,9 +616,11 @@ function checkSolved() {
   playTone(659, 0.08);
   window.setTimeout(() => playTone(880, 0.12), 90);
   document.querySelector(".wood-board")?.classList.add("celebrate");
+  window.setTimeout(() => document.querySelector(".wood-board")?.classList.remove("celebrate"), 700);
   const defaultRecord = levelsForPack()[state.levelIndex].defaultRecord;
-  const defaultMessage = state.moves < defaultRecord ? " You beat the default record, so this level turned gold." : ` Default record: ${defaultRecord} moves.`;
-  winSummary.textContent = `${state.moves} moves.${isRecord ? " New personal best." : ""}${defaultMessage}`;
+  const recordWord = state.moves < defaultRecord ? "Gold record beaten." : `Default record: ${defaultRecord} moves.`;
+  const paceWord = state.moves < defaultRecord ? " Great route." : "";
+  winSummary.textContent = `${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}`;
   winDialog.classList.remove("hidden");
 }
 
@@ -614,6 +634,7 @@ function loadLevel(index) {
   state.history = saved?.history || [];
   state.moveLog = saved?.moveLog || [];
   state.selectedColumn = null;
+  state.lastMove = null;
   state.moves = saved?.moves || 0;
   state.completed = false;
   state.dragFromColumn = null;
@@ -638,6 +659,7 @@ function undoMove() {
   state.moves = previous.moves;
   state.moveLog = previous.moveLog || [];
   state.selectedColumn = null;
+  state.lastMove = null;
   state.dragFromColumn = null;
   winDialog.classList.add("hidden");
   statusText.textContent = "Move undone. Choose the top token from any column.";
@@ -657,6 +679,7 @@ function newScramble() {
   state.history = [];
   state.moveLog = [];
   state.selectedColumn = null;
+  state.lastMove = null;
   state.moves = 0;
   state.completed = false;
   winDialog.classList.add("hidden");
@@ -695,6 +718,16 @@ function showHint() {
   document.querySelector(`.play-column[data-column="${move.from}"]`)?.classList.add("hint-source");
   document.querySelector(`.play-column[data-column="${move.to}"]`)?.classList.add("hint-target");
   statusText.textContent = `Hint: move the top token from column ${move.from + 1} to column ${move.to + 1}.`;
+}
+
+function showTutorial() {
+  tutorialDialog.classList.remove("hidden");
+  tutorialStartBtn.focus();
+}
+
+function hideTutorial() {
+  localStorage.setItem(tutorialKey, "true");
+  tutorialDialog.classList.add("hidden");
 }
 
 function bestLocalMove() {
@@ -823,6 +856,7 @@ restartBtn.addEventListener("click", restartLevel);
 mobileRestartBtn.addEventListener("click", restartLevel);
 undoBtn.addEventListener("click", undoMove);
 mobileUndoBtn.addEventListener("click", undoMove);
+tutorialBtn.addEventListener("click", showTutorial);
 hintBtn.addEventListener("click", showHint);
 mobileHintBtn.addEventListener("click", showHint);
 newScrambleBtn.addEventListener("click", newScramble);
@@ -854,8 +888,17 @@ winReplayBtn.addEventListener("click", restartLevel);
 winDialog.addEventListener("click", (event) => {
   if (event.target === winDialog) winDialog.classList.add("hidden");
 });
+tutorialStartBtn.addEventListener("click", hideTutorial);
+tutorialHintBtn.addEventListener("click", () => {
+  hideTutorial();
+  showHint();
+});
+tutorialDialog.addEventListener("click", (event) => {
+  if (event.target === tutorialDialog) hideTutorial();
+});
 
 if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
 packSelect.value = state.packId;
 applyPrefs();
 loadLevel(0);
+if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
