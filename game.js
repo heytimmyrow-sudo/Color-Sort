@@ -4,9 +4,9 @@ const colorSymbols = { red: "R", yellow: "Y", green: "G", blue: "B" };
 const targetHeight = 4;
 const columnCount = 4;
 const columnCapacity = 6;
-const recordsKey = "tokenColumnsRecordsV2";
-const progressKey = "tokenColumnsProgressV2";
-const savesKey = "tokenColumnsSavesV2";
+const recordsKey = "tokenColumnsRecordsV3";
+const progressKey = "tokenColumnsProgressV3";
+const savesKey = "tokenColumnsSavesV3";
 const prefsKey = "tokenColumnsPrefsV2";
 const packKey = "tokenColumnsPackV2";
 const liveUrl = "https://new-games-jcrow.timmyrow.chatgpt.site";
@@ -138,7 +138,7 @@ function createTarget(random, levelIndex, pack) {
 function createLevel(index, pack, salt = 0) {
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
   const target = createTarget(random, index, pack);
-  let board = cloneColumns(target);
+  let board = target.map((column) => [...column].reverse());
   const moveCountGoal = Math.max(12, 20 + index + pack.extra + Math.floor(random() * 12));
   let lastMove = null;
   const scrambleMoves = [];
@@ -191,7 +191,8 @@ function countMatches(board, target) {
   let matches = 0;
   for (let column = 0; column < columnCount; column += 1) {
     for (let row = 0; row < targetHeight; row += 1) {
-      if (board[column][row] === target[column][row]) matches += 1;
+      const boardIndex = targetHeight - 1 - row;
+      if (board[column][boardIndex] === target[column][row]) matches += 1;
     }
   }
   return matches;
