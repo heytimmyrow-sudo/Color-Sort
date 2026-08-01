@@ -35,17 +35,20 @@
 
       <section class="play-layout">
         <aside class="level-panel" aria-label="Level selection">
-          <div class="profile-card" aria-label="Player save profile">
-            <label class="select-label" for="profileSelect">Player</label>
-            <select id="profileSelect"></select>
-            <div class="profile-actions">
-              <button id="newProfileBtn" type="button">New</button>
-              <button id="exportProfileBtn" type="button">Export</button>
-              <button id="importProfileBtn" type="button">Import</button>
+          <details class="side-menu profile-menu">
+            <summary>Player</summary>
+            <div class="profile-card" aria-label="Player save profile">
+              <label class="select-label" for="profileSelect">Player save</label>
+              <select id="profileSelect"></select>
+              <div class="profile-actions">
+                <button id="newProfileBtn" type="button">New</button>
+                <button id="exportProfileBtn" type="button">Export</button>
+                <button id="importProfileBtn" type="button">Import</button>
+              </div>
+              <input id="importProfileInput" type="file" accept="application/json" hidden>
+              <p id="profileText">Progress saves automatically.</p>
             </div>
-            <input id="importProfileInput" type="file" accept="application/json" hidden>
-            <p id="profileText">Progress saves automatically.</p>
-          </div>
+          </details>
           <label class="select-label" for="packSelect">Level pack</label>
           <select id="packSelect">
             <option value="classic">Classic</option>
@@ -106,25 +109,11 @@
           <div class="match-meter" aria-label="Matched token progress">
             <span id="matchMeterFill"></span>
           </div>
-          <div class="actions">
+          <div class="actions play-actions">
             <button class="primary" id="nextLevelBtn" type="button">Next Level</button>
-            <button id="tutorialBtn" type="button">How to Play</button>
             <button id="hintBtn" type="button">Hint</button>
             <button id="restartBtn" type="button">Restart</button>
             <button id="undoBtn" type="button">Undo Move</button>
-            <button id="newScrambleBtn" type="button">New Scramble</button>
-            <button id="shareBtn" type="button">Share Result</button>
-            <button id="clearRecordsBtn" type="button">Clear Records</button>
-          </div>
-          <div class="settings-grid" aria-label="Game settings">
-            <button id="muteBtn" type="button">Sound On</button>
-            <button id="symbolsBtn" type="button">Symbols Off</button>
-            <label class="select-label" for="themeSelect">Theme</label>
-            <select id="themeSelect">
-              <option value="toy">Toy</option>
-              <option value="dark">Dark</option>
-              <option value="contrast">High Contrast</option>
-            </select>
           </div>
           <div class="wallet-panel" aria-label="Coins and unlocks">
             <div>
@@ -133,18 +122,43 @@
             </div>
             <span id="hardcoreStatus">Hardcore locked</span>
           </div>
-          <details class="progress-drawer">
+          <details class="side-menu">
+            <summary>More</summary>
+            <div class="menu-actions">
+              <button id="tutorialBtn" type="button">How to Play</button>
+              <button id="newScrambleBtn" type="button">New Scramble</button>
+              <button id="shareBtn" type="button">Share Result</button>
+              <button id="clearRecordsBtn" type="button">Clear Records</button>
+            </div>
+          </details>
+          <details class="side-menu">
+            <summary>Settings</summary>
+            <div class="settings-grid" aria-label="Game settings">
+              <button id="muteBtn" type="button">Sound On</button>
+              <button id="symbolsBtn" type="button">Symbols Off</button>
+              <label class="select-label" for="themeSelect">Theme</label>
+              <select id="themeSelect">
+                <option value="toy">Toy</option>
+                <option value="dark">Dark</option>
+                <option value="contrast">High Contrast</option>
+              </select>
+            </div>
+          </details>
+          <details class="side-menu progress-drawer">
             <summary>Achievements</summary>
             <div class="achievement-grid" id="achievementGrid"></div>
           </details>
-          <details class="progress-drawer">
+          <details class="side-menu progress-drawer">
             <summary>Shop</summary>
             <div class="shop-grid" id="shopGrid"></div>
           </details>
-          <div class="history-tray" aria-label="Move history">
+          <details class="side-menu">
+            <summary>Move History</summary>
+            <div class="history-tray" aria-label="Move history">
             <span class="status-label">Move History</span>
             <ol id="moveHistoryList"></ol>
-          </div>
+            </div>
+          </details>
         </aside>
       </section>
 

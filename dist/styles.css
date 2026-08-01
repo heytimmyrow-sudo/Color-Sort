@@ -200,9 +200,7 @@ h1 {
 .profile-card {
   display: grid;
   gap: 8px;
-  margin-bottom: 14px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid rgba(114, 83, 48, .2);
+  padding: 0 10px 10px;
 }
 
 .profile-actions {
@@ -224,6 +222,50 @@ h1 {
   font-size: 11px;
   font-weight: 800;
   line-height: 1.25;
+}
+
+.side-menu {
+  overflow: hidden;
+  border: 1px solid rgba(75, 54, 33, .16);
+  border-radius: 8px;
+  background: #fffaf0;
+}
+
+.side-menu summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px;
+  color: var(--ink);
+  font-weight: 950;
+  cursor: pointer;
+  list-style: none;
+}
+
+.side-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.side-menu summary::after {
+  content: "+";
+  display: grid;
+  place-items: center;
+  width: 24px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: rgba(32, 26, 22, .1);
+  font-size: 18px;
+  line-height: 1;
+}
+
+.side-menu[open] summary::after {
+  content: "-";
+}
+
+.profile-menu {
+  margin-bottom: 14px;
 }
 
 .level-head {
@@ -740,6 +782,7 @@ body[data-board-style="space"] {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+  padding: 0 10px 10px;
 }
 
 .settings-grid .select-label,
@@ -770,23 +813,6 @@ body[data-board-style="space"] {
   font-size: 12px;
   font-weight: 850;
   line-height: 1.25;
-}
-
-.progress-drawer {
-  overflow: hidden;
-  border: 1px solid rgba(75, 54, 33, .16);
-  border-radius: 8px;
-  background: #fffaf0;
-}
-
-.progress-drawer summary {
-  min-height: 42px;
-  display: flex;
-  align-items: center;
-  padding: 0 12px;
-  color: var(--ink);
-  font-weight: 950;
-  cursor: pointer;
 }
 
 .achievement-grid,
@@ -859,11 +885,17 @@ body[data-board-style="space"] {
   color: #f1d319;
 }
 
+.menu-actions {
+  display: grid;
+  gap: 8px;
+  padding: 0 10px 10px;
+}
+
 .history-tray {
   min-height: 92px;
   padding: 10px;
   border-radius: 8px;
-  background: #f5ead8;
+  background: transparent;
 }
 
 .history-tray ol {
@@ -971,6 +1003,10 @@ body[data-board-style="space"] {
 .actions {
   display: grid;
   gap: 9px;
+}
+
+.play-actions {
+  grid-template-columns: 1fr 1fr;
 }
 
 .actions.horizontal {
