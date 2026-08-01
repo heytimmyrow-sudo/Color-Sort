@@ -4,8 +4,8 @@
     "totalBytes": 8388608
   },
   "totals": {
-    "bytes": 213101,
-    "gzipBytes": 50957
+    "bytes": 217631,
+    "gzipBytes": 51493
   },
   "withinBudget": true,
   "files": [
@@ -26,13 +26,13 @@
     },
     {
       "path": "game.js",
-      "bytes": 69695,
-      "gzipBytes": 16475
+      "bytes": 71960,
+      "gzipBytes": 16743
     },
     {
       "path": "game-v2.js",
-      "bytes": 69695,
-      "gzipBytes": 16475
+      "bytes": 71960,
+      "gzipBytes": 16743
     },
     {
       "path": "app-icon.svg",

@@ -382,15 +382,49 @@ function createHandAuthoredLevel(index) {
   };
 }
 
+function createBridgeLevel(index, pack) {
+  const random = mulberry32(pack.seed + index * 577 + 4109);
+  const target = starterTarget();
+  const capacities = Array(columnCount).fill(columnCapacity);
+  const board = target.map((column) => [...column].reverse());
+  const moveCountGoal = 10 + (index - tutorialLevelCount) * 3;
+  const scrambleMoves = [];
+  let lastMove = null;
+  for (let step = 0; step < moveCountGoal; step += 1) {
+    const legal = legalMoves(board, capacities);
+    const choices = legal.filter((move) => !lastMove || !(move.from === lastMove.to && move.to === lastMove.from));
+    const move = chooseScrambleMove(board, target, choices.length ? choices : legal, random, step, moveCountGoal);
+    applyMove(board, move.from, move.to);
+    scrambleMoves.push(move);
+    lastMove = move;
+  }
+  const fallbackSolution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
+  const solution = findShortestSolution(board, target, 90000, capacities) || fallbackSolution;
+  const proofBoard = cloneColumns(board);
+  solution.forEach((move) => applyMove(proofBoard, move.from, move.to));
+  if (!isSolved(proofBoard, target)) throw new Error(`Bridge ${pack.name} level ${index + 1} is not solvable`);
+  return {
+    target,
+    board,
+    solution,
+    capacities,
+    defaultRecord: solution.length + 3 + (index % 3),
+    difficulty: difficultyFor(solution.length)
+  };
+}
+
 function createLevel(index, pack, salt = 0) {
   if (salt === 0 && (pack.id === "classic" || pack.id === "starter") && index < tutorialLevelCount) {
     return createHandAuthoredLevel(index);
+  }
+  if (salt === 0 && pack.id === "classic" && index < tutorialLevelCount + 5) {
+    return createBridgeLevel(index, pack);
   }
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
   const target = createTarget(random, index, pack);
   const capacities = capacitiesForLevel(index, pack);
   let board = target.map((column) => [...column].reverse());
-  const moveCountGoal = Math.max(16, minimumSolutionLength(index, pack) + 12 + Math.floor(random() * 14));
+  const moveCountGoal = Math.max(8, minimumSolutionLength(index, pack) + 6 + Math.floor(random() * 8));
   let lastMove = null;
   const scrambleMoves = [];
 
@@ -442,42 +476,42 @@ function chooseScrambleMove(board, target, choices, random, step, moveCountGoal)
     return { move, matches: countMatches(nextBoard, target) };
   }).sort((a, b) => a.matches - b.matches);
   const awayMoves = scored.filter((item) => item.matches <= currentMatches);
-  const pool = step < moveCountGoal * 0.92 && awayMoves.length ? awayMoves : scored;
-  const spread = Math.max(1, Math.ceil(pool.length * 0.34));
+  const pool = step < moveCountGoal * 0.76 && awayMoves.length ? awayMoves : scored;
+  const spread = Math.max(1, Math.ceil(pool.length * 0.56));
   return pool[Math.floor(random() * spread)].move;
 }
 
 function maxStartingMatches(index, pack) {
   if (pack.id === "classic" && index < tutorialLevelCount) return 15;
   if (pack.id === "starter" && index < tutorialLevelCount) return 15;
-  if (pack.id === "starter") return 5;
-  if (pack.id === "classic") return index < 18 ? 4 : 3;
-  if (pack.id === "challenge") return 3;
-  if (pack.id === "expert") return 2;
-  if (pack.id === "hardcore") return 1;
-  if (pack.id === "daily") return 3;
+  if (pack.id === "starter") return index < 12 ? 9 : index < 22 ? 7 : 5;
+  if (pack.id === "classic") return index < 12 ? 8 : index < 26 ? 6 : 4;
+  if (pack.id === "challenge") return index < 12 ? 7 : index < 30 ? 5 : 3;
+  if (pack.id === "expert") return index < 15 ? 6 : index < 34 ? 4 : 2;
+  if (pack.id === "hardcore") return index < 16 ? 4 : 2;
+  if (pack.id === "daily") return 5;
   return 5;
 }
 
 function minimumSolutionLength(index, pack) {
-  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(26 + Math.floor((index - tutorialLevelCount) * 0.7), 52);
-  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(20 + Math.floor((index - tutorialLevelCount) * 0.6), 36);
-  if (pack.id === "challenge") return Math.min(36 + Math.floor(index * 0.7), 66);
-  if (pack.id === "expert") return Math.min(50 + Math.floor(index * 0.75), 84);
-  if (pack.id === "hardcore") return Math.min(66 + Math.floor(index * 0.85), 108);
-  if (pack.id === "daily") return 42;
+  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(10 + Math.floor((index - tutorialLevelCount) * 0.95), 42);
+  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(8 + Math.floor((index - tutorialLevelCount) * 0.7), 26);
+  if (pack.id === "challenge") return Math.min(20 + Math.floor(index * 0.75), 52);
+  if (pack.id === "expert") return Math.min(32 + Math.floor(index * 0.8), 70);
+  if (pack.id === "hardcore") return Math.min(48 + Math.floor(index * 0.85), 90);
+  if (pack.id === "daily") return 26;
   return 16;
 }
 
 function capacitiesForLevel(index, pack) {
   if (pack.id === "classic" && index < tutorialLevelCount) return [6, 6, 6, 6];
   if (pack.id === "starter" && index < tutorialLevelCount) return [6, 6, 6, 6];
-  if (pack.id === "starter") return [5, 5, 6, 6];
-  if (pack.id === "classic") return index < 18 ? [5, 5, 5, 6] : [5, 5, 5, 5];
-  if (pack.id === "challenge") return [5, 5, 5, 5];
-  if (pack.id === "expert") return [5, 5, 5, 5];
+  if (pack.id === "starter") return index < 16 ? [6, 6, 6, 6] : [5, 6, 6, 6];
+  if (pack.id === "classic") return index < 12 ? [6, 6, 6, 6] : index < 28 ? [5, 6, 6, 6] : [5, 5, 5, 6];
+  if (pack.id === "challenge") return index < 15 ? [5, 6, 6, 6] : [5, 5, 5, 6];
+  if (pack.id === "expert") return index < 18 ? [5, 5, 5, 6] : [5, 5, 5, 5];
   if (pack.id === "hardcore") return [5, 5, 5, 5];
-  if (pack.id === "daily") return [4, 4, 5, 5];
+  if (pack.id === "daily") return [5, 5, 5, 6];
   return [6, 6, 6, 6];
 }
 
@@ -1315,18 +1349,24 @@ function updateMinimumDisplay() {
       }
     }
     level.minimumMoves = answer ? answer.length : level.solution.length;
+    if (answer) {
+      level.defaultRecord = answer.length + 3 + (index % 3);
+      level.difficulty = isTutorialLevel(index, pack.id) ? "Tutorial" : difficultyFor(answer.length);
+      updateStats();
+      renderLevelButtons();
+    }
     minimumMoves.textContent = `Minimum ${level.minimumMoves}`;
   }, 20);
 }
 
 function minimumAcceptableMoves(index, pack) {
-  if (pack.id === "starter") return index < tutorialLevelCount ? 0 : 18;
-  if (pack.id === "classic") return index < tutorialLevelCount ? 0 : 24;
-  if (pack.id === "challenge") return 34;
-  if (pack.id === "expert") return 46;
-  if (pack.id === "hardcore") return 58;
-  if (pack.id === "daily") return 28;
-  return 18;
+  if (pack.id === "starter") return index < tutorialLevelCount ? 0 : Math.min(7 + Math.floor((index - tutorialLevelCount) * 0.45), 18);
+  if (pack.id === "classic") return index < tutorialLevelCount ? 0 : Math.min(9 + Math.floor((index - tutorialLevelCount) * 0.65), 30);
+  if (pack.id === "challenge") return Math.min(18 + Math.floor(index * 0.45), 34);
+  if (pack.id === "expert") return Math.min(26 + Math.floor(index * 0.55), 48);
+  if (pack.id === "hardcore") return Math.min(42 + Math.floor(index * 0.6), 62);
+  if (pack.id === "daily") return 22;
+  return 10;
 }
 
 function checkSolved() {
