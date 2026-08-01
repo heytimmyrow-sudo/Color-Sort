@@ -13,6 +13,7 @@ const tutorialKey = "tokenColumnsTutorialSeenV1";
 const starsKey = "tokenColumnsStarsV1";
 const unlocksKey = "tokenColumnsUnlocksV1";
 const liveUrl = window.location.origin;
+const tutorialLevelCount = 5;
 
 const packDefs = [
   { id: "classic", name: "Classic", total: 40, seed: 90210, extra: 0 },
@@ -188,6 +189,14 @@ function starText(count) {
   return count > 0 ? "*".repeat(count) : "";
 }
 
+function isTutorialLevel(index = state.levelIndex, packId = state.packId) {
+  return (packId === "classic" || packId === "starter") && index < tutorialLevelCount;
+}
+
+function tutorialStatus(index = state.levelIndex) {
+  return `Tutorial ${index + 1} of ${tutorialLevelCount}: move only the top circle, then match the card.`;
+}
+
 function createTarget(random, levelIndex, pack) {
   const bag = colorOrder.flatMap((color) => Array(targetHeight).fill(color));
   let target = toColumns(shuffle(bag, random));
@@ -218,8 +227,8 @@ function createHandAuthoredLevel(index) {
     target,
     board,
     solution,
-    defaultRecord: solution.length + 5,
-    difficulty: difficultyFor(solution.length)
+    defaultRecord: solution.length + 3 + (index % 3),
+    difficulty: index < tutorialLevelCount ? "Tutorial" : difficultyFor(solution.length)
   };
 }
 
@@ -256,7 +265,7 @@ function createLevel(index, pack, salt = 0) {
     target,
     board,
     solution,
-    defaultRecord: solution.length + 5 + Math.floor(random() * 6),
+    defaultRecord: solution.length + 3 + Math.floor(random() * 3),
     difficulty: difficultyFor(solution.length)
   };
 }
@@ -380,9 +389,9 @@ function renderLevelButtons() {
     number.textContent = String(index + 1);
     const stars = document.createElement("span");
     stars.className = "level-stars";
-    stars.textContent = unlocked ? starText(starCount) : "LOCK";
+    stars.textContent = unlocked ? (starCount ? starText(starCount) : (isTutorialLevel(index) ? "TUT" : "")) : "LOCK";
     button.append(number, stars);
-    button.setAttribute("aria-label", `${activePack().name} level ${index + 1}, ${level.difficulty}`);
+    button.setAttribute("aria-label", `${activePack().name} level ${index + 1}, ${level.difficulty}${isTutorialLevel(index) ? ", tutorial" : ""}`);
     if (index === state.levelIndex) button.classList.add("active");
     if (!unlocked) {
       button.classList.add("locked");
@@ -398,7 +407,7 @@ function renderLevelButtons() {
       button.title = "In progress";
     } else {
       button.classList.add("not-attempted");
-      button.title = "Not attempted";
+      button.title = isTutorialLevel(index) ? "Tutorial level" : "Not attempted";
     }
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
@@ -748,7 +757,8 @@ function checkSolved() {
   const recordWord = state.moves < defaultRecord ? "Gold record beaten." : `Default record: ${defaultRecord} moves.`;
   const paceWord = state.moves < defaultRecord ? " Great route." : "";
   const unlockWord = state.levelIndex < levelsForPack().length - 1 ? ` Level ${state.levelIndex + 2} unlocked.` : " Pack complete.";
-  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${unlockWord}`;
+  const tutorialWord = isTutorialLevel() ? ` Tutorial ${state.levelIndex + 1} complete.` : "";
+  winSummary.textContent = `${earnedStars} stars. ${state.moves} moves.${paceWord}${isRecord ? " New personal best." : ""} ${recordWord}${tutorialWord}${unlockWord}`;
   winDialog.classList.remove("hidden");
 }
 
@@ -773,7 +783,7 @@ function loadLevel(index) {
   state.completed = false;
   state.dragFromColumn = null;
   winDialog.classList.add("hidden");
-  statusText.textContent = saved ? "Your exact board was restored. Continue from where you left off." : "Lift the top token from a column, then drop it onto another column with room.";
+  statusText.textContent = saved ? "Your exact board was restored. Continue from where you left off." : (isTutorialLevel() ? tutorialStatus() : "Lift the top token from a column, then drop it onto another column with room.");
   renderLevelButtons();
   renderTargets();
   renderBoard();
