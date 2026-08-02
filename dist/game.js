@@ -1094,6 +1094,7 @@ function renderHistory() {
 
 function handlePointerDown(event, columnIndex) {
   if (state.completed || state.board[columnIndex].length === 0 || event.button > 0) return;
+  if (event.pointerType === "touch" || event.pointerType === "pen") event.preventDefault();
   clearHighlights();
   const topColor = state.board[columnIndex][state.board[columnIndex].length - 1];
   pointerDrag = {
@@ -1110,13 +1111,16 @@ function handlePointerDown(event, columnIndex) {
     target: event.currentTarget
   };
   event.currentTarget.setPointerCapture?.(event.pointerId);
-  event.currentTarget.addEventListener("pointermove", handlePointerMove);
-  event.currentTarget.addEventListener("pointerup", handlePointerUp);
-  event.currentTarget.addEventListener("pointercancel", cancelPointerDrag);
+  window.addEventListener("pointermove", handlePointerMove, { passive: false });
+  window.addEventListener("pointerup", handlePointerUp, { passive: false });
+  window.addEventListener("pointercancel", handlePointerCancel, { passive: false });
+  window.addEventListener("blur", handlePointerCancel);
 }
 
 function handlePointerMove(event) {
   if (!pointerDrag) return;
+  if (event.pointerId !== pointerDrag.pointerId) return;
+  if (event.cancelable) event.preventDefault();
   pointerDrag.x = event.clientX;
   pointerDrag.y = event.clientY;
   const distance = Math.hypot(pointerDrag.x - pointerDrag.startX, pointerDrag.y - pointerDrag.startY);
@@ -1129,14 +1133,24 @@ function handlePointerMove(event) {
 
 function handlePointerUp(event) {
   if (!pointerDrag) return;
+  if (event.pointerId !== pointerDrag.pointerId) return;
+  if (event.cancelable) event.preventDefault();
   const drag = pointerDrag;
   const wasActive = drag.active;
   const dropColumn = wasActive ? nearestDropColumn(event.clientX, event.clientY) : null;
+  const canDrop = dropColumn !== null && canMoveToColumn(drag.fromColumn, dropColumn);
   cancelPointerDrag();
   if (wasActive) {
-    if (dropColumn !== null) moveTopToken(drag.fromColumn, dropColumn);
-    else statusText.textContent = "Drop the token onto a column with open space.";
+    if (canDrop) moveTopToken(drag.fromColumn, dropColumn);
+    else returnTokenToSource("That column cannot hold this token. It snapped back.");
   }
+}
+
+function handlePointerCancel(event) {
+  if (!pointerDrag) return;
+  if (event?.pointerId !== undefined && event.pointerId !== pointerDrag.pointerId) return;
+  cancelPointerDrag();
+  returnTokenToSource("Drag canceled. The token returned to its column.");
 }
 
 function startPointerDrag() {
@@ -1164,9 +1178,10 @@ function cancelPointerDrag() {
       // Some browsers release capture automatically on pointerup.
     }
   }
-  pointerDrag?.target?.removeEventListener("pointermove", handlePointerMove);
-  pointerDrag?.target?.removeEventListener("pointerup", handlePointerUp);
-  pointerDrag?.target?.removeEventListener("pointercancel", cancelPointerDrag);
+  window.removeEventListener("pointermove", handlePointerMove);
+  window.removeEventListener("pointerup", handlePointerUp);
+  window.removeEventListener("pointercancel", handlePointerCancel);
+  window.removeEventListener("blur", handlePointerCancel);
   if (pointerDrag?.ghost) pointerDrag.ghost.remove();
   pointerDrag = null;
   document.body.classList.remove("pointer-dragging");
@@ -1177,6 +1192,13 @@ function cancelPointerDrag() {
   window.setTimeout(() => {
     suppressNextClick = false;
   }, 80);
+}
+
+function returnTokenToSource(message) {
+  state.selectedColumn = null;
+  clearHighlights();
+  renderBoard();
+  statusText.textContent = message;
 }
 
 function movePointerGhost() {
@@ -1196,7 +1218,7 @@ function nearestDropColumn(x, y) {
     return { element, rect, index, distance: Math.hypot(x - centerX, y - centerY) };
   }).filter((column) => {
     if (!Number.isInteger(column.index) || column.index === pointerDrag.fromColumn) return false;
-    if (state.board[column.index].length >= capacities[column.index]) return false;
+    if (!canMoveToColumn(pointerDrag.fromColumn, column.index, capacities)) return false;
     const verticalPad = Math.max(44, column.rect.height * 0.12);
     return y >= column.rect.top - verticalPad && y <= column.rect.bottom + verticalPad;
   });
@@ -1205,6 +1227,14 @@ function nearestDropColumn(x, y) {
   const closest = columns[0];
   const horizontalReach = Math.max(closest.rect.width * 0.78, 86);
   return Math.abs(x - (closest.rect.left + closest.rect.width / 2)) <= horizontalReach ? closest.index : null;
+}
+
+function canMoveToColumn(fromColumn, toColumn, capacities = currentCapacities()) {
+  return Number.isInteger(fromColumn)
+    && Number.isInteger(toColumn)
+    && fromColumn !== toColumn
+    && state.board[fromColumn]?.length > 0
+    && state.board[toColumn]?.length < capacities[toColumn];
 }
 
 function highlightPointerDropTarget() {
@@ -1295,9 +1325,9 @@ function moveTopToken(fromColumn, toColumn) {
     renderBoard();
     return;
   }
-  if (state.board[toColumn].length >= currentCapacities()[toColumn]) {
+  if (!canMoveToColumn(fromColumn, toColumn)) {
     state.selectedColumn = null;
-    statusText.textContent = "That column is full. Choose a column with open space.";
+    statusText.textContent = "That column is full. The token returned to its original column.";
     renderBoard();
     return;
   }

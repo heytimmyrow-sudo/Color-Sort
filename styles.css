@@ -684,6 +684,16 @@ h1 {
 
 .pointer-dragging {
   user-select: none;
+  overflow: hidden;
+  touch-action: none;
+  overscroll-behavior: none;
+}
+
+.pointer-dragging .app,
+.pointer-dragging .play-column,
+.pointer-dragging .top-token-slot,
+.pointer-dragging .token {
+  touch-action: none;
 }
 
 .drag-ghost {
