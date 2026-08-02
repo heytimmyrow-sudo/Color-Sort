@@ -13,7 +13,9 @@ const binaryFileNames = [
 ];
 const aliases = {
   "styles-v2.css": "styles.css",
-  "game-v2.js": "game.js"
+  "styles-v3.css": "styles.css",
+  "game-v2.js": "game.js",
+  "game-v3.js": "game.js"
 };
 
 const textFiles = Object.fromEntries(await Promise.all(
@@ -33,8 +35,10 @@ const contentTypes = {
   "index.html": "text/html; charset=utf-8",
   "styles.css": "text/css; charset=utf-8",
   "styles-v2.css": "text/css; charset=utf-8",
+  "styles-v3.css": "text/css; charset=utf-8",
   "game.js": "text/javascript; charset=utf-8",
   "game-v2.js": "text/javascript; charset=utf-8",
+  "game-v3.js": "text/javascript; charset=utf-8",
   "app-icon.svg": "image/svg+xml; charset=utf-8",
   "qr-code.svg": "image/svg+xml; charset=utf-8",
   "app-icon-180.png": "image/png",

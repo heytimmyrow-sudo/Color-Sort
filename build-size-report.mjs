@@ -3,10 +3,8 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 const initialFiles = [
   "index.html",
-  "styles.css",
-  "styles-v2.css",
-  "game.js",
-  "game-v2.js",
+  "styles-v3.css",
+  "game-v3.js",
   "app-icon.svg",
   "qr-code.svg",
   "app-icon-180.png",
