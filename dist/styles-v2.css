@@ -1341,7 +1341,296 @@ body[data-board-style="space"] {
   }
 }
 
-@media (max-width: 640px) {
+@media (orientation: landscape) and (max-height: 820px) {
+  .app {
+    min-height: 100svh;
+    padding: max(6px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
+    place-items: start center;
+  }
+
+  .game-shell {
+    width: min(1180px, 100%);
+    gap: 8px;
+  }
+
+  .topbar {
+    align-items: center;
+    padding: 8px 10px;
+  }
+
+  h1 {
+    font-size: clamp(21px, 3.2vw, 34px);
+  }
+
+  .eyebrow {
+    margin-bottom: 2px;
+    font-size: 10px;
+  }
+
+  .record-panel {
+    min-width: 118px;
+    padding: 7px 9px;
+  }
+
+  .record-panel strong {
+    font-size: 20px;
+  }
+
+  .play-layout {
+    grid-template-columns: minmax(118px, 150px) minmax(360px, 1fr) minmax(160px, 210px);
+    gap: 8px;
+  }
+
+  .level-panel,
+  .board-area,
+  .control-panel {
+    order: 0;
+  }
+
+  .level-panel,
+  .control-panel {
+    max-height: calc(100svh - 72px);
+    overflow: auto;
+    padding: 8px;
+  }
+
+  .level-grid {
+    grid-template-columns: repeat(5, 1fr);
+    gap: 5px;
+  }
+
+  .level-button {
+    min-height: 30px;
+    padding: 2px;
+    font-size: 10px;
+  }
+
+  .level-meta,
+  .level-legend,
+  .wallet-panel,
+  .history-tray,
+  .profile-card p {
+    font-size: 10px;
+  }
+
+  .side-menu summary,
+  select,
+  button {
+    min-height: 34px;
+  }
+
+  .status-box {
+    padding: 8px;
+  }
+
+  .status-box p {
+    min-height: auto;
+    font-size: 12px;
+    line-height: 1.2;
+  }
+
+  .stats {
+    gap: 6px;
+  }
+
+  .stats div {
+    padding: 8px 6px;
+  }
+
+  .actions {
+    gap: 6px;
+  }
+
+  .actions button {
+    min-height: 34px;
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+
+  .board-area {
+    align-content: start;
+  }
+
+  .display-base {
+    width: min(540px, 100%);
+    padding: 0 26px 10px;
+  }
+
+  .display-base::before {
+    height: 42px;
+  }
+
+  .display-base::after {
+    bottom: 5px;
+    height: 10px;
+  }
+
+  .hanger-block {
+    width: 60px;
+    height: 42px;
+  }
+
+  .target-card {
+    width: min(470px, 100%);
+    padding: 10px 20px 9px;
+  }
+
+  .ring-strip {
+    top: -12px;
+  }
+
+  .ring-strip span {
+    width: 20px;
+    height: 32px;
+    border-width: 5px;
+  }
+
+  .target-grid,
+  .slots {
+    gap: clamp(6px, 1.8vw, 16px);
+  }
+
+  .target-column {
+    gap: 4px;
+  }
+
+  .target-token {
+    width: clamp(20px, 5svh, 34px);
+  }
+
+  .wood-board {
+    width: min(560px, 100%);
+    margin-top: 5px;
+    padding: clamp(12px, 3svh, 24px) clamp(14px, 3vw, 28px);
+  }
+
+  .wood-board::before {
+    inset: clamp(10px, 2.4svh, 20px);
+  }
+
+  .wood-board::after {
+    left: clamp(34px, 7vw, 68px);
+    right: clamp(34px, 7vw, 68px);
+    top: clamp(21px, 4svh, 34px);
+    height: 14px;
+  }
+
+  .play-column {
+    min-height: clamp(210px, 48svh, 360px);
+    padding-block: 4px;
+  }
+
+  .slot {
+    min-height: clamp(31px, 7svh, 56px);
+  }
+
+  .token {
+    width: clamp(34px, 7.8svh, 60px);
+  }
+
+  .blocked-slot::after {
+    width: clamp(28px, 6svh, 42px);
+  }
+
+  .qr-section {
+    display: none;
+  }
+}
+
+@media (orientation: landscape) and (max-width: 900px) and (max-height: 520px) {
+  .mobile-controls {
+    display: none;
+  }
+
+  .topbar {
+    display: none;
+  }
+
+  .play-layout {
+    grid-template-columns: 112px minmax(330px, 1fr) 156px;
+    gap: 6px;
+  }
+
+  .level-panel,
+  .control-panel {
+    max-height: calc(100svh - 12px);
+    padding: 6px;
+  }
+
+  .level-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .level-legend,
+  .wallet-panel,
+  .match-meter,
+  .history-tray {
+    display: none;
+  }
+
+  .display-base {
+    width: min(430px, 100%);
+    padding-inline: 18px;
+  }
+
+  .target-card {
+    width: min(380px, 100%);
+    padding: 7px 16px 6px;
+  }
+
+  .wood-board {
+    width: min(430px, 100%);
+    padding: 10px 14px;
+  }
+
+  .play-column {
+    min-height: clamp(184px, 50svh, 250px);
+  }
+
+  .slot {
+    min-height: clamp(27px, 7.2svh, 40px);
+  }
+
+  .token {
+    width: clamp(30px, 8.4svh, 44px);
+  }
+
+  .target-token {
+    width: clamp(18px, 5.6svh, 25px);
+  }
+}
+
+@media (orientation: landscape) and (min-width: 901px) and (max-width: 1180px) and (max-height: 900px) {
+  .play-layout {
+    grid-template-columns: 150px minmax(520px, 1fr) 210px;
+  }
+
+  .display-base {
+    width: min(610px, 100%);
+  }
+
+  .target-card {
+    width: min(520px, 100%);
+  }
+
+  .wood-board {
+    width: min(610px, 100%);
+  }
+
+  .play-column {
+    min-height: clamp(320px, 48svh, 440px);
+  }
+
+  .slot {
+    min-height: clamp(44px, 7svh, 64px);
+  }
+
+  .token {
+    width: clamp(48px, 7.8svh, 70px);
+  }
+}
+
+@media (max-width: 640px) and (orientation: portrait) {
   .app {
     padding: 8px 10px 86px;
     place-items: start center;
