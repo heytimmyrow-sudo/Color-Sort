@@ -180,8 +180,7 @@ const tutorialStartBtn = document.querySelector("#tutorialStartBtn");
 const tutorialHintBtn = document.querySelector("#tutorialHintBtn");
 
 function dailySeed() {
-  const now = new Date();
-  return Number(`${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`);
+  return hashSeed(`daily:${dailyId()}:token-columns`);
 }
 
 function dailyId(offsetDays = 0) {
@@ -197,6 +196,15 @@ function mulberry32(seed) {
     value ^= value + Math.imul(value ^ value >>> 7, value | 61);
     return ((value ^ value >>> 14) >>> 0) / 4294967296;
   };
+}
+
+function hashSeed(text) {
+  let hash = 2166136261;
+  for (let index = 0; index < text.length; index += 1) {
+    hash ^= text.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
 }
 
 function cloneColumns(columns) {
@@ -225,10 +233,11 @@ function packById(packId) {
 }
 
 function levelsForPack(pack = activePack()) {
-  if (!levelCache.has(pack.id)) {
-    levelCache.set(pack.id, Array.from({ length: pack.total }, (_, index) => createLevel(index, pack)));
+  const cacheKey = pack.id === "daily" ? `${pack.id}:${dailyId()}` : pack.id;
+  if (!levelCache.has(cacheKey)) {
+    levelCache.set(cacheKey, Array.from({ length: pack.total }, (_, index) => createLevel(index, pack)));
   }
-  return levelCache.get(pack.id);
+  return levelCache.get(cacheKey);
 }
 
 function levelKey(index = state.levelIndex) {
@@ -349,12 +358,27 @@ function tutorialStatus(index = state.levelIndex) {
 function createTarget(random, levelIndex, pack) {
   const bag = colorOrder.flatMap((color) => Array(targetHeight).fill(color));
   let target = toColumns(shuffle(bag, random));
+  if (pack.id === "daily") target = dailyTarget(target, pack.seed);
   if ((pack.id === "starter" || pack.id === "classic") && levelIndex < tutorialLevelCount) {
     target = Array.from({ length: columnCount }, (_, columnIndex) => {
       return [...colorOrder.slice(columnIndex), ...colorOrder.slice(0, columnIndex)];
     });
   }
   return target;
+}
+
+function dailyTarget(target, seed) {
+  const random = mulberry32(seed ^ 0x9E3779B9);
+  const copy = cloneColumns(target);
+  const twists = 3 + (seed % 6);
+  for (let twist = 0; twist < twists; twist += 1) {
+    const fromColumn = Math.floor(random() * columnCount);
+    const toColumn = Math.floor(random() * columnCount);
+    const fromRow = Math.floor(random() * targetHeight);
+    const toRow = Math.floor(random() * targetHeight);
+    [copy[fromColumn][fromRow], copy[toColumn][toRow]] = [copy[toColumn][toRow], copy[fromColumn][fromRow]];
+  }
+  return copy;
 }
 
 function starterTarget() {
@@ -425,7 +449,7 @@ function createLevel(index, pack, salt = 0) {
   const target = createTarget(random, index, pack);
   const capacities = capacitiesForLevel(index, pack);
   let board = target.map((column) => [...column].reverse());
-  const moveCountGoal = Math.max(8, minimumSolutionLength(index, pack) + 6 + Math.floor(random() * 8));
+  const moveCountGoal = Math.max(8, minimumSolutionLength(index, pack) + dailyMoveBonus(pack, random) + 6 + Math.floor(random() * 8));
   let lastMove = null;
   const scrambleMoves = [];
 
@@ -500,7 +524,7 @@ function minimumSolutionLength(index, pack) {
   if (pack.id === "challenge") return Math.min(20 + Math.floor(index * 0.75), 52);
   if (pack.id === "expert") return Math.min(32 + Math.floor(index * 0.8), 70);
   if (pack.id === "hardcore") return Math.min(48 + Math.floor(index * 0.85), 90);
-  if (pack.id === "daily") return 26;
+  if (pack.id === "daily") return 20 + (pack.seed % 13);
   return 16;
 }
 
@@ -512,8 +536,27 @@ function capacitiesForLevel(index, pack) {
   if (pack.id === "challenge") return index < 15 ? [5, 6, 6, 6] : [5, 5, 5, 6];
   if (pack.id === "expert") return index < 18 ? [5, 5, 5, 6] : [5, 5, 5, 5];
   if (pack.id === "hardcore") return [5, 5, 5, 5];
-  if (pack.id === "daily") return [5, 5, 5, 6];
+  if (pack.id === "daily") return dailyCapacities(pack.seed);
   return [6, 6, 6, 6];
+}
+
+function dailyMoveBonus(pack, random) {
+  if (pack.id !== "daily") return 0;
+  return Math.floor(random() * 10) + (pack.seed % 7);
+}
+
+function dailyCapacities(seed) {
+  const patterns = [
+    [6, 6, 5, 5],
+    [6, 5, 6, 5],
+    [5, 6, 5, 6],
+    [6, 5, 5, 6],
+    [5, 5, 6, 6],
+    [5, 6, 6, 5],
+    [5, 5, 5, 6],
+    [5, 5, 6, 5]
+  ];
+  return [...patterns[seed % patterns.length]];
 }
 
 function pokiCall(method) {
