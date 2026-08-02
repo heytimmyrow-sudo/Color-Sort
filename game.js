@@ -575,6 +575,24 @@ function pokiCall(method) {
   }
 }
 
+function shouldLoadPokiSdk() {
+  const host = window.location.hostname.toLowerCase();
+  return host === "poki.com" || host.endsWith(".poki.com");
+}
+
+function loadPokiSdk() {
+  if (window.PokiSDK) return Promise.resolve(window.PokiSDK);
+  if (!shouldLoadPokiSdk()) return Promise.resolve(null);
+  return new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://game-cdn.poki.com/scripts/v2/poki-sdk.js";
+    script.async = true;
+    script.onload = () => resolve(window.PokiSDK || null);
+    script.onerror = () => resolve(null);
+    document.head.append(script);
+  });
+}
+
 function waitForPokiSdk(timeout = 900) {
   if (window.PokiSDK) return Promise.resolve(window.PokiSDK);
   return new Promise((resolve) => {
@@ -595,7 +613,7 @@ function waitForPokiSdk(timeout = 900) {
 
 function initPoki() {
   if (pokiInitPromise) return pokiInitPromise;
-  pokiInitPromise = waitForPokiSdk().then((api) => {
+  pokiInitPromise = loadPokiSdk().then((loadedApi) => loadedApi || (shouldLoadPokiSdk() ? waitForPokiSdk() : null)).then((api) => {
     if (!api) return false;
     if (typeof api.init !== "function") {
       pokiInitialized = true;
