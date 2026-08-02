@@ -1162,6 +1162,11 @@ body[data-board-style="space"] {
   box-shadow: 0 24px 70px rgba(0, 0, 0, .3);
 }
 
+.win-card > :not(.win-burst) {
+  position: relative;
+  z-index: 1;
+}
+
 .win-card h2 {
   font-size: 38px;
 }
@@ -1229,29 +1234,56 @@ body[data-board-style="space"] {
 
 .win-burst {
   position: absolute;
-  inset: 0;
+  inset: -40px;
   pointer-events: none;
+  opacity: .95;
+}
+
+.win-burst::before,
+.win-burst::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 170px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 16px solid rgba(255, 221, 91, .42);
+  transform: translate(-50%, -50%) scale(.2);
+  animation: poof-ring .88s cubic-bezier(.15, .78, .2, 1) both;
+}
+
+.win-burst::after {
+  width: 230px;
+  border-color: rgba(66, 173, 68, .22);
+  animation-delay: .08s;
 }
 
 .win-burst span {
   position: absolute;
-  width: 18px;
-  aspect-ratio: 1;
+  width: 78px;
+  height: 54px;
   border-radius: 50%;
-  animation: burst-pop .8s ease-out both;
+  filter: blur(1px);
+  opacity: 0;
+  animation: poof-cloud .95s cubic-bezier(.13, .82, .2, 1) both;
 }
 
-.win-burst span:nth-child(1) { left: 18%; top: 24%; background: var(--red); }
-.win-burst span:nth-child(2) { right: 18%; top: 20%; background: var(--yellow); animation-delay: .05s; }
-.win-burst span:nth-child(3) { left: 28%; bottom: 18%; background: var(--green); animation-delay: .1s; }
-.win-burst span:nth-child(4) { right: 24%; bottom: 20%; background: var(--blue); animation-delay: .15s; }
-.win-burst span:nth-child(5) { left: 8%; top: 54%; background: var(--yellow); animation-delay: .2s; }
-.win-burst span:nth-child(6) { right: 9%; top: 55%; background: var(--red); animation-delay: .24s; }
-.win-burst span:nth-child(7) { left: 45%; bottom: 6%; background: var(--blue); animation-delay: .28s; }
-.win-burst span:nth-child(8) { left: 48%; top: 8%; background: var(--green); animation-delay: .32s; }
+.win-burst span:nth-child(1) { left: 12%; top: 28%; background: rgba(223, 47, 37, .42); --x: -64px; --y: -34px; }
+.win-burst span:nth-child(2) { right: 12%; top: 24%; background: rgba(241, 211, 25, .5); --x: 60px; --y: -40px; animation-delay: .04s; }
+.win-burst span:nth-child(3) { left: 24%; bottom: 18%; background: rgba(66, 173, 68, .42); --x: -52px; --y: 44px; animation-delay: .08s; }
+.win-burst span:nth-child(4) { right: 22%; bottom: 20%; background: rgba(8, 119, 201, .4); --x: 56px; --y: 38px; animation-delay: .12s; }
+.win-burst span:nth-child(5) { left: 40%; top: 12%; background: rgba(241, 211, 25, .36); --x: -12px; --y: -62px; animation-delay: .16s; }
+.win-burst span:nth-child(6) { right: 38%; bottom: 8%; background: rgba(223, 47, 37, .3); --x: 18px; --y: 62px; animation-delay: .2s; }
+.win-burst span:nth-child(7) { left: 4%; top: 54%; background: rgba(8, 119, 201, .26); --x: -74px; --y: 12px; animation-delay: .24s; }
+.win-burst span:nth-child(8) { right: 4%; top: 52%; background: rgba(66, 173, 68, .28); --x: 74px; --y: 12px; animation-delay: .28s; }
 
 .wood-board.celebrate .token {
   animation: token-pop .52s ease-in-out both;
+}
+
+.wood-board.celebrate {
+  animation: board-poof .7s ease-out both;
 }
 
 @keyframes token-pop {
@@ -1281,6 +1313,24 @@ body[data-board-style="space"] {
   0% { transform: translateY(18px) scale(.2); opacity: 0; }
   35% { opacity: .95; }
   100% { transform: translateY(-42px) scale(1.2); opacity: 0; }
+}
+
+@keyframes poof-cloud {
+  0% { transform: translate(0, 0) scale(.15); opacity: 0; }
+  20% { opacity: .68; }
+  100% { transform: translate(var(--x), var(--y)) scale(1.95); opacity: 0; }
+}
+
+@keyframes poof-ring {
+  0% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+  18% { opacity: .85; }
+  100% { transform: translate(-50%, -50%) scale(1.35); opacity: 0; }
+}
+
+@keyframes board-poof {
+  0% { filter: brightness(1); }
+  28% { filter: brightness(1.1) saturate(1.1); }
+  100% { filter: brightness(1); }
 }
 
 .tutorial-dialog {
