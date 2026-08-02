@@ -4,8 +4,8 @@
     "totalBytes": 8388608
   },
   "totals": {
-    "bytes": 239374,
-    "gzipBytes": 55692
+    "bytes": 241124,
+    "gzipBytes": 56014
   },
   "withinBudget": true,
   "files": [
@@ -16,13 +16,13 @@
     },
     {
       "path": "styles.css",
-      "bytes": 35938,
-      "gzipBytes": 7598
+      "bytes": 36813,
+      "gzipBytes": 7759
     },
     {
       "path": "styles-v2.css",
-      "bytes": 35938,
-      "gzipBytes": 7598
+      "bytes": 36813,
+      "gzipBytes": 7759
     },
     {
       "path": "game.js",
