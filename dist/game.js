@@ -136,6 +136,9 @@ const matchedCount = document.querySelector("#matchedCount");
 const matchMeterFill = document.querySelector("#matchMeterFill");
 const statusText = document.querySelector("#statusText");
 const packSelect = document.querySelector("#packSelect");
+const dailyLevelBtn = document.querySelector("#dailyLevelBtn");
+const dailyButtonStatus = document.querySelector("#dailyButtonStatus");
+const panelDailyBtn = document.querySelector("#panelDailyBtn");
 const profileSelect = document.querySelector("#profileSelect");
 const newProfileBtn = document.querySelector("#newProfileBtn");
 const exportProfileBtn = document.querySelector("#exportProfileBtn");
@@ -187,6 +190,10 @@ function dailyId(offsetDays = 0) {
   const date = new Date();
   date.setDate(date.getDate() + offsetDays);
   return `${date.getFullYear()}${String(date.getMonth() + 1).padStart(2, "0")}${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function dailyLabel() {
+  return new Date().toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
 function mulberry32(seed) {
@@ -897,6 +904,7 @@ function clearCurrentSave(index = state.levelIndex) {
 function renderLevelButtons() {
   renderPackOptions();
   coinCount.textContent = String(state.coins);
+  renderDailyButton();
   const streakText = state.stats.dailyStreak ? ` Daily streak: ${state.stats.dailyStreak}.` : "";
   hardcoreStatus.textContent = `${hardcoreUnlocked() ? "Hardcore unlocked" : "Hardcore unlocks after all main packs."}${streakText}`;
   updateSkipControls();
@@ -938,6 +946,18 @@ function renderLevelButtons() {
     button.addEventListener("click", () => loadLevel(index));
     levelGrid.append(button);
   });
+}
+
+function renderDailyButton() {
+  const solvedToday = state.records[recordKey("daily", 0)] !== undefined;
+  dailyLevelBtn.classList.toggle("active", state.packId === "daily");
+  dailyLevelBtn.classList.toggle("solved", solvedToday);
+  panelDailyBtn.classList.toggle("active", state.packId === "daily");
+  panelDailyBtn.classList.toggle("solved", solvedToday);
+  dailyButtonStatus.textContent = solvedToday ? "Done today" : dailyLabel();
+  dailyLevelBtn.setAttribute("aria-label", solvedToday ? "Open today's completed Daily level" : "Open today's Daily level");
+  panelDailyBtn.textContent = solvedToday ? "Daily Done" : "Daily Level";
+  panelDailyBtn.setAttribute("aria-label", solvedToday ? "Open today's completed Daily level" : "Open today's Daily level");
 }
 
 function updateSkipControls() {
@@ -1848,6 +1868,8 @@ importProfileInput.addEventListener("change", () => {
   if (file) importProfileFile(file);
 });
 packSelect.addEventListener("change", () => setPack(packSelect.value));
+dailyLevelBtn.addEventListener("click", () => setPack("daily"));
+panelDailyBtn.addEventListener("click", () => setPack("daily"));
 restartBtn.addEventListener("click", restartLevel);
 mobileRestartBtn.addEventListener("click", restartLevel);
 undoBtn.addEventListener("click", undoMove);
