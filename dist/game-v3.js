@@ -57,7 +57,10 @@ const shopItems = [
   { id: "token-neon", kind: "tokenStyle", value: "neon", name: "Neon Tokens", cost: 180 },
   { id: "bg-ocean", kind: "boardStyle", value: "ocean", name: "Ocean Board", cost: 110 },
   { id: "bg-garden", kind: "boardStyle", value: "garden", name: "Garden Board", cost: 110 },
-  { id: "bg-space", kind: "boardStyle", value: "space", name: "Space Board", cost: 160 }
+  { id: "bg-space", kind: "boardStyle", value: "space", name: "Space Board", cost: 160 },
+  { id: "win-stars", kind: "winStyle", value: "stars", name: "Star Poof", cost: 90 },
+  { id: "win-bubbles", kind: "winStyle", value: "bubbles", name: "Bubble Pop", cost: 130 },
+  { id: "win-fireworks", kind: "winStyle", value: "fireworks", name: "Firework Pop", cost: 190 }
 ];
 
 const defaultProfileState = {
@@ -70,8 +73,8 @@ const defaultProfileState = {
   prefs: { muted: false, symbols: false, theme: "toy" },
   coins: 0,
   achievements: {},
-  unlockedCosmetics: { "token-classic": true, "board-maple": true },
-  cosmetics: { tokenStyle: "classic", boardStyle: "maple" },
+  unlockedCosmetics: { "token-classic": true, "board-maple": true, "win-poof": true },
+  cosmetics: { tokenStyle: "classic", boardStyle: "maple", winStyle: "poof" },
   stats: { totalMoves: 0, totalWins: 0, shopPurchases: 0, dailyStreak: 0, bestDailyStreak: 0, lastDailyDate: "" }
 };
 
@@ -1854,6 +1857,7 @@ function applyPrefs() {
   document.body.dataset.theme = state.prefs.theme;
   document.body.dataset.tokenStyle = state.cosmetics.tokenStyle;
   document.body.dataset.boardStyle = state.cosmetics.boardStyle;
+  document.body.dataset.winStyle = state.cosmetics.winStyle || "poof";
   document.body.classList.toggle("symbols-on", state.prefs.symbols);
   muteBtn.textContent = state.prefs.muted ? "Sound Off" : "Sound On";
   symbolsBtn.textContent = state.prefs.symbols ? "Symbols On" : "Symbols Off";
