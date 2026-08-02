@@ -414,12 +414,29 @@ function createHandAuthoredLevel(index) {
   };
 }
 
+function bridgeMoveTarget(index, pack) {
+  const rampIndex = Math.max(0, index - tutorialLevelCount);
+  if (pack.id === "starter") return 4 + Math.floor(rampIndex * 1.45);
+  return 4 + Math.floor(rampIndex * 1.25);
+}
+
+function bridgeLevelCount(pack) {
+  return pack.id === "starter" ? 20 : 12;
+}
+
+function isBridgeRampLevel(index, pack) {
+  return (pack.id === "classic" || pack.id === "starter")
+    && index >= tutorialLevelCount
+    && index < tutorialLevelCount + bridgeLevelCount(pack);
+}
+
 function createBridgeLevel(index, pack) {
   const random = mulberry32(pack.seed + index * 577 + 4109);
   const target = starterTarget();
   const capacities = Array(columnCount).fill(columnCapacity);
+  const rampIndex = Math.max(0, index - tutorialLevelCount);
+  const moveCountGoal = bridgeMoveTarget(index, pack) + 1 + Math.floor(rampIndex / 4);
   const board = target.map((column) => [...column].reverse());
-  const moveCountGoal = 10 + (index - tutorialLevelCount) * 3;
   const scrambleMoves = [];
   let lastMove = null;
   for (let step = 0; step < moveCountGoal; step += 1) {
@@ -430,8 +447,7 @@ function createBridgeLevel(index, pack) {
     scrambleMoves.push(move);
     lastMove = move;
   }
-  const fallbackSolution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
-  const solution = findShortestSolution(board, target, 90000, capacities) || fallbackSolution;
+  const solution = [...scrambleMoves].reverse().map((move) => ({ from: move.to, to: move.from }));
   const proofBoard = cloneColumns(board);
   solution.forEach((move) => applyMove(proofBoard, move.from, move.to));
   if (!isSolved(proofBoard, target)) throw new Error(`Bridge ${pack.name} level ${index + 1} is not solvable`);
@@ -449,7 +465,7 @@ function createLevel(index, pack, salt = 0) {
   if (salt === 0 && (pack.id === "classic" || pack.id === "starter") && index < tutorialLevelCount) {
     return createHandAuthoredLevel(index);
   }
-  if (salt === 0 && pack.id === "classic" && index < tutorialLevelCount + 5) {
+  if (salt === 0 && isBridgeRampLevel(index, pack)) {
     return createBridgeLevel(index, pack);
   }
   const random = mulberry32(pack.seed + index * 177 + salt * 9973);
@@ -516,8 +532,10 @@ function chooseScrambleMove(board, target, choices, random, step, moveCountGoal)
 function maxStartingMatches(index, pack) {
   if (pack.id === "classic" && index < tutorialLevelCount) return 15;
   if (pack.id === "starter" && index < tutorialLevelCount) return 15;
-  if (pack.id === "starter") return index < 12 ? 9 : index < 22 ? 7 : 5;
-  if (pack.id === "classic") return index < 12 ? 8 : index < 26 ? 6 : 4;
+  if (pack.id === "starter" && index < tutorialLevelCount + 10) return Math.max(8, 13 - Math.floor((index - tutorialLevelCount) * 0.55));
+  if (pack.id === "classic" && index < tutorialLevelCount + 10) return Math.max(7, 12 - Math.floor((index - tutorialLevelCount) * 0.55));
+  if (pack.id === "starter") return index < 22 ? 7 : 5;
+  if (pack.id === "classic") return index < 26 ? 6 : 4;
   if (pack.id === "challenge") return index < 12 ? 7 : index < 30 ? 5 : 3;
   if (pack.id === "expert") return index < 15 ? 6 : index < 34 ? 4 : 2;
   if (pack.id === "hardcore") return index < 16 ? 4 : 2;
@@ -526,8 +544,8 @@ function maxStartingMatches(index, pack) {
 }
 
 function minimumSolutionLength(index, pack) {
-  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(10 + Math.floor((index - tutorialLevelCount) * 0.95), 42);
-  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(8 + Math.floor((index - tutorialLevelCount) * 0.7), 26);
+  if (pack.id === "classic") return index < tutorialLevelCount ? index + 1 : Math.min(6 + Math.floor((index - tutorialLevelCount) * 0.95), 42);
+  if (pack.id === "starter") return index < tutorialLevelCount ? index + 1 : Math.min(5 + Math.floor((index - tutorialLevelCount) * 0.75), 26);
   if (pack.id === "challenge") return Math.min(20 + Math.floor(index * 0.75), 52);
   if (pack.id === "expert") return Math.min(32 + Math.floor(index * 0.8), 70);
   if (pack.id === "hardcore") return Math.min(48 + Math.floor(index * 0.85), 90);
@@ -1443,7 +1461,7 @@ function updateMinimumDisplay() {
   window.setTimeout(() => {
     let answer = findShortestSolution(level.board, level.target, 160000, level.capacities);
     const floor = minimumAcceptableMoves(index, pack);
-    if (!isTutorialLevel(index, pack.id) && state.moves === 0 && answer && answer.length < floor) {
+    if (!isTutorialLevel(index, pack.id) && !isBridgeRampLevel(index, pack) && state.moves === 0 && answer && answer.length < floor) {
       for (let salt = 1; salt <= 10; salt += 1) {
         const replacement = createLevel(index, pack, salt + 1000);
         const replacementAnswer = findShortestSolution(replacement.board, replacement.target, 160000, replacement.capacities);
@@ -1478,8 +1496,8 @@ function updateMinimumDisplay() {
 }
 
 function minimumAcceptableMoves(index, pack) {
-  if (pack.id === "starter") return index < tutorialLevelCount ? 0 : Math.min(7 + Math.floor((index - tutorialLevelCount) * 0.45), 18);
-  if (pack.id === "classic") return index < tutorialLevelCount ? 0 : Math.min(9 + Math.floor((index - tutorialLevelCount) * 0.65), 30);
+  if (pack.id === "starter") return index < tutorialLevelCount ? 0 : Math.min(4 + Math.floor((index - tutorialLevelCount) * 0.55), 18);
+  if (pack.id === "classic") return index < tutorialLevelCount ? 0 : Math.min(5 + Math.floor((index - tutorialLevelCount) * 0.7), 30);
   if (pack.id === "challenge") return Math.min(18 + Math.floor(index * 0.45), 34);
   if (pack.id === "expert") return Math.min(26 + Math.floor(index * 0.55), 48);
   if (pack.id === "hardcore") return Math.min(42 + Math.floor(index * 0.6), 62);
