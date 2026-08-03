@@ -20,6 +20,8 @@ const tutorialLevelCount = 5;
 const defaultProfileId = "player-1";
 const campaignPackIds = ["classic", "starter", "challenge", "expert"];
 const skipCoinCost = 50;
+const memoryStorage = new Map();
+let persistentStorageAvailable = true;
 
 const packDefs = [
   { id: "classic", name: "Classic", total: 40, seed: 90210, extra: 0 },
@@ -729,7 +731,7 @@ function difficultyFor(solutionLength) {
 
 function loadStoredMap(key) {
   try {
-    const value = JSON.parse(localStorage.getItem(key) || "{}");
+    const value = JSON.parse(readDeviceStorage(key) || "{}");
     return value && typeof value === "object" ? value : {};
   } catch {
     return {};
@@ -737,7 +739,58 @@ function loadStoredMap(key) {
 }
 
 function saveJson(key, value) {
-  localStorage.setItem(key, JSON.stringify(value));
+  writeDeviceStorage(key, JSON.stringify(value));
+}
+
+function testDeviceStorage() {
+  try {
+    const key = "tokenColumnsStorageTest";
+    window.localStorage.setItem(key, "1");
+    window.localStorage.removeItem(key);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readDeviceStorage(key) {
+  if (!persistentStorageAvailable) return memoryStorage.get(key) || null;
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    persistentStorageAvailable = false;
+    return memoryStorage.get(key) || null;
+  }
+}
+
+function writeDeviceStorage(key, value) {
+  memoryStorage.set(key, value);
+  if (!persistentStorageAvailable) return false;
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    persistentStorageAvailable = false;
+    return false;
+  }
+}
+
+function removeDeviceStorage(key) {
+  memoryStorage.delete(key);
+  if (!persistentStorageAvailable) return false;
+  try {
+    window.localStorage.removeItem(key);
+    return true;
+  } catch {
+    persistentStorageAvailable = false;
+    return false;
+  }
+}
+
+function deviceSaveDescription() {
+  return persistentStorageAvailable
+    ? "Progress saves only on this device. Export makes a backup file."
+    : "This browser is blocking saved progress. Export a backup before closing.";
 }
 
 function mergeDefaults(value, defaults) {
@@ -772,16 +825,16 @@ function profileName(profileId) {
 
 function loadActiveProfileId() {
   const profiles = readProfiles();
-  const stored = localStorage.getItem(activeProfileKey);
+  const stored = readDeviceStorage(activeProfileKey);
   return profiles[stored] ? stored : defaultProfileId;
 }
 
 function ensureLegacyProfile() {
   const profiles = readProfiles();
-  if (localStorage.getItem(legacyMigrationKey) === "true") return;
+  if (readDeviceStorage(legacyMigrationKey) === "true") return;
   const legacy = {
     ...defaultProfileState,
-    packId: localStorage.getItem(packKey) || "classic",
+    packId: readDeviceStorage(packKey) || "classic",
     records: loadStoredMap(recordsKey),
     progress: loadStoredMap(progressKey),
     saves: loadStoredMap(savesKey),
@@ -792,8 +845,8 @@ function ensureLegacyProfile() {
   saveJson(profileStorageKey(defaultProfileId), legacy);
   profiles[defaultProfileId] = profiles[defaultProfileId] || { id: defaultProfileId, name: "Player 1", createdAt: Date.now() };
   saveJson(profileRegistryKey, profiles);
-  localStorage.setItem(activeProfileKey, defaultProfileId);
-  localStorage.setItem(legacyMigrationKey, "true");
+  writeDeviceStorage(activeProfileKey, defaultProfileId);
+  writeDeviceStorage(legacyMigrationKey, "true");
 }
 
 function loadProfileState(profileId) {
@@ -831,7 +884,7 @@ function renderProfiles() {
     profileSelect.append(option);
   });
   profileSelect.value = state.profileId;
-  profileText.textContent = `${state.profileName}: auto-saving to this profile. Export makes a backup file.`;
+  profileText.textContent = `${state.profileName}: ${deviceSaveDescription()}`;
 }
 
 function switchProfile(profileId) {
@@ -852,7 +905,7 @@ function switchProfile(profileId) {
     completed: false,
     dragFromColumn: null
   });
-  localStorage.setItem(activeProfileKey, profileId);
+  writeDeviceStorage(activeProfileKey, profileId);
   hydrateUnlocksFromRecords();
   applyPrefs();
   renderProfiles();
@@ -1743,7 +1796,7 @@ function showTutorial() {
 }
 
 function hideTutorial() {
-  localStorage.setItem(tutorialKey, "true");
+  writeDeviceStorage(tutorialKey, "true");
   tutorialDialog.classList.add("hidden");
 }
 
@@ -1958,6 +2011,7 @@ tutorialDialog.addEventListener("click", (event) => {
 });
 
 async function startApp() {
+  persistentStorageAvailable = testDeviceStorage();
   if (!packDefs.some((pack) => pack.id === state.packId)) state.packId = "classic";
   if (!packAvailable(state.packId)) state.packId = "classic";
   packSelect.value = state.packId;
@@ -1972,7 +2026,7 @@ async function startApp() {
   evaluateAchievements();
   updateSkipControls();
   pokiCall("gameLoadingFinished");
-  if (localStorage.getItem(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
+  if (readDeviceStorage(tutorialKey) !== "true") window.setTimeout(showTutorial, 350);
 }
 
 startApp();
